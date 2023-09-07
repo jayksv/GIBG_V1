@@ -40,7 +40,8 @@ public class authToken {
             // Extract necessary claims (you can add more as needed)
             Long authenticatedUserId = claims.get("user_id", Long.class);
             Long roleId = claims.get("role_id", Long.class);
-            String role = claims.get("role_name", String.class);
+            System.out.println(roleId);
+//            String role = claims.get("role_name", String.class);
             // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
             if (roleId !=1  && roleId !=2 ) {
                 ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
