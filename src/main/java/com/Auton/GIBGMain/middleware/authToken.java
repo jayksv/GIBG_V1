@@ -1,6 +1,7 @@
 package com.Auton.GIBGMain.middleware;
 
 import com.Auton.GIBGMain.Response.ResponseWrapper;
+import com.Auton.GIBGMain.Response.adminDTO.AdminAllDTO;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
+import java.util.List;
 
 @Component
 public class authToken {
@@ -18,6 +20,7 @@ public class authToken {
 
     public ResponseEntity<ResponseWrapper<Void>> validateAuthorizationHeader(String authorizationHeader) {
         try {
+
             if (authorizationHeader == null || authorizationHeader.isBlank()) {
                 ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
@@ -38,9 +41,9 @@ public class authToken {
             }
 
             // Extract necessary claims (you can add more as needed)
-            Long authenticatedUserId = claims.get("user_id", Long.class);
+            String authenticatedUserId = claims.get("user_id", String.class);
             Long roleId = claims.get("role_id", Long.class);
-            System.out.println(roleId);
+
 //            String role = claims.get("role_name", String.class);
             // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
             if (roleId !=1  && roleId !=2 ) {

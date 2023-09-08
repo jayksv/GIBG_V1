@@ -117,14 +117,15 @@ public class admin_Controller {
         }
     }
     @GetMapping("/user/all")
-    public ResponseEntity<ResponseWrapper<List<AdminAllDTO>>> getAllUsers(@RequestHeader("Authorization") String authorizationHeader) {
+    public ResponseEntity<ResponseWrapper<List<AdminAllDTO>>> getAllUsers( @RequestHeader("Authorization") String authorizationHeader) {
+
+
         try {
 
             if (authorizationHeader == null || authorizationHeader.isBlank()) {
-                ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+               ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
-
             // Verify the token from the Authorization header
             String token = authorizationHeader.substring("Bearer ".length());
 
@@ -139,15 +140,19 @@ public class admin_Controller {
                 ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
-            // Extract necessary claims (you can add more as needed)
-            Long authenticatedUserId = claims.get("user_id", Long.class);
-            String role = claims.get("role_name", String.class);
 
-            // Check if the user has the appropriate role to perform this action (e.g., admin)
-            if (!"admin".equalsIgnoreCase(role) && !"super admin".equalsIgnoreCase(role)) {
+            // Extract necessary claims (you can add more as needed)
+            String authenticatedUserId = claims.get("user_id", String.class);
+            Long roleId = claims.get("role_id", Long.class);
+
+//            String role = claims.get("role_name", String.class);
+            // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
+            if (roleId !=1  && roleId !=2 ) {
                 ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
             }
+
+
             String sql = "SELECT *FROM `tb_view` WHERE role_id <> 1";
 
             List<AdminAllDTO> users = jdbcTemplate.query(sql, (resultSet, rowNum) -> {
@@ -201,8 +206,6 @@ public class admin_Controller {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
 
-            // Check if the user has permission to access this data
-            // You can add your permission logic here if needed
 
             // Query the user by ID
             String sql = "SELECT * FROM `tb_view` WHERE user_id = ?";
@@ -260,8 +263,10 @@ public class admin_Controller {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
 
-            Long authenticatedUserId = claims.get("user_id", Long.class);
+            // Extract necessary claims (you can add more as needed)
+            String authenticatedUserId = claims.get("user_id", String.class);
 
+System.out.println(authenticatedUserId);
             // Query the user by ID
             String sql = "SELECT * FROM `tb_view` WHERE user_id = ?";
             AdminAllDTO user = jdbcTemplate.queryForObject(sql, new Object[] { authenticatedUserId }, (resultSet, rowNum) -> {
@@ -284,10 +289,13 @@ public class admin_Controller {
                 return ResponseEntity.notFound().build(); // Return 404 without a response body
             }
         } catch (JwtException e) {
-            // Token is invalid or has expired
+            // Log the exception to see the details
+            e.printStackTrace();
+            String errorMessage = "Token is invalid.";
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ResponseWrapper<>("Token is invalid.", null));
-        } catch (Exception e) {
+                    .body(new ResponseWrapper<>(errorMessage, null));
+        }
+        catch (Exception e) {
             // Log the error for debugging
             e.printStackTrace();
             String errorMessage = "An error occurred while retrieving user profile.";
