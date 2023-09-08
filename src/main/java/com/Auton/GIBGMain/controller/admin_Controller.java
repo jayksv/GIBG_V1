@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Date;
@@ -38,6 +39,7 @@ public class admin_Controller {
 
     @Autowired
     private admin_repository adminRepository;
+
     @Value("${jwt_secret}")
     private String jwt_secret;
     @Autowired
@@ -147,7 +149,7 @@ public class admin_Controller {
 
 //            String role = claims.get("role_name", String.class);
             // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
-            if (roleId !=1  && roleId !=2 ) {
+            if (roleId !=2 ) {
                 ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
             }
@@ -372,7 +374,7 @@ System.out.println(authenticatedUserId);
 
             req_user.setIs_active("Active");
 //            user.setAddress_id(savedAddress.getAddressId().longValue());
-            req_user.setRole_id((long) 1);
+            req_user.setRole_id((long) 2);
 
                 admin_entity savedUser = adminRepository.save(req_user);
 
@@ -402,16 +404,13 @@ System.out.println(authenticatedUserId);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
             // Check if the user with the given userId exists
-            Optional<admin_entity> existingUserOptional = adminRepository.findById(Long.valueOf(userId));
+            admin_entity existingUser = adminRepository.findByUserId(userId);
 
-            if (existingUserOptional.isEmpty()) {
+            if (existingUser == null) {
                 // User not found, return an error response
                 ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("User not found.", null);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseWrapper);
             }
-
-            // Get the existing user entity
-            admin_entity existingUser = existingUserOptional.get();
 
             // Update the user entity with the new data
             existingUser.setUsername(updatedUser.getUsername());
@@ -431,4 +430,40 @@ System.out.println(authenticatedUserId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+    @DeleteMapping("/user/delete/{userId}")
+    public ResponseEntity<ResponseWrapper<String>> deleteUser(
+            @PathVariable String userId,
+            @RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            // Validate authorization using authService
+            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+            if (authResponse.getStatusCode() != HttpStatus.OK) {
+                // Token is invalid or has expired
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            // Check if the user with the given userId exists
+            admin_entity existingUser = adminRepository.findByUserId(userId);
+
+            if (existingUser == null) {
+                // User not found, return an error response
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("User not found.", null);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseWrapper);
+            }
+
+            // Delete the user
+            adminRepository.delete(existingUser);
+
+            ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("User deleted successfully.", null);
+            return ResponseEntity.ok(responseWrapper);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            String errorMessage = "An error occurred while deleting the user.";
+            ResponseWrapper<String> errorResponse = new ResponseWrapper<>(errorMessage, null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
 }

@@ -18,7 +18,7 @@ public class AdminAllDTO {
 //    private String password;
     private String surname;
     private String phone;
-    private String secret_password;
+//    private String secret_password;
 //    private String role_name;
     private Date created_at;
     private Long vehicle_id;

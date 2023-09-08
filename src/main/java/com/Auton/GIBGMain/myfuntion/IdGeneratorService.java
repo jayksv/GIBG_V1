@@ -9,16 +9,13 @@ import java.util.Random;
 @Service
 public class IdGeneratorService {
     public String generateUserId() {
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
-        String timestamp = dateFormat.format(new Date());
-
         String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         StringBuilder randomChars = new StringBuilder();
         Random random = new Random();
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 5; i++) { // เพิ่มจำนวนตัวอักษรตามที่คุณต้องการ
             randomChars.append(characters.charAt(random.nextInt(characters.length())));
         }
 
-        return timestamp + randomChars.toString();
+        return randomChars.toString();
     }
 }
