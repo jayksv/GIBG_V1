@@ -120,8 +120,35 @@ public class admin_Controller {
     public ResponseEntity<ResponseWrapper<List<AdminAllDTO>>> getAllUsers(@RequestHeader("Authorization") String authorizationHeader) {
         try {
 
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
 
-            String sql = "SELECT *FROM `tb_view`";
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+            // Extract necessary claims (you can add more as needed)
+            Long authenticatedUserId = claims.get("user_id", Long.class);
+            String role = claims.get("role_name", String.class);
+
+            // Check if the user has the appropriate role to perform this action (e.g., admin)
+            if (!"admin".equalsIgnoreCase(role) && !"super admin".equalsIgnoreCase(role)) {
+                ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
+            }
+            String sql = "SELECT *FROM `tb_view` WHERE role_id <> 1";
 
             List<AdminAllDTO> users = jdbcTemplate.query(sql, (resultSet, rowNum) -> {
                 AdminAllDTO usersDTO = new AdminAllDTO();
@@ -151,6 +178,123 @@ public class admin_Controller {
                     .body(new ResponseWrapper<>(errorMessage, null));
         }
     }
+    @GetMapping("/user/findbyid/{userId}")
+    public ResponseEntity<ResponseWrapper<AdminAllDTO>> getUserById(@RequestHeader("Authorization") String authorizationHeader, @PathVariable String userId) {
+        try {
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            // Check if the user has permission to access this data
+            // You can add your permission logic here if needed
+
+            // Query the user by ID
+            String sql = "SELECT * FROM `tb_view` WHERE user_id = ?";
+            AdminAllDTO user = jdbcTemplate.queryForObject(sql, new Object[] { userId }, (resultSet, rowNum) -> {
+                AdminAllDTO userDTO = new AdminAllDTO();
+                userDTO.setUser_id(resultSet.getString("user_id"));
+                userDTO.setUsername(resultSet.getString("email"));
+                userDTO.setEmail(resultSet.getString("username"));
+                userDTO.setSurname(resultSet.getString("surname"));
+                userDTO.setPhone(resultSet.getString("phone"));
+                userDTO.setVehicle_id(resultSet.getLong("vehicle_id"));
+                userDTO.setCreated_at(resultSet.getDate("created_at"));
+                userDTO.setIs_active(resultSet.getString("is_active"));
+                return userDTO;
+            });
+
+            if (user != null) {
+                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("User found by ID.", user);
+                return ResponseEntity.ok(responseWrapper);
+            } else {
+                return ResponseEntity.notFound().build(); // Return 404 without a response body
+            }
+        } catch (JwtException e) {
+            // Token is invalid or has expired
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ResponseWrapper<>("Token is invalid.", null));
+        } catch (Exception e) {
+            // Log the error for debugging
+            e.printStackTrace();
+            String errorMessage = "An error occurred while retrieving user data by ID.";
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ResponseWrapper<>(errorMessage, null));
+        }
+    }
+    @PostMapping("/user/profile")
+    public ResponseEntity<ResponseWrapper<AdminAllDTO>> getUserProfile(@RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            Long authenticatedUserId = claims.get("user_id", Long.class);
+
+            // Query the user by ID
+            String sql = "SELECT * FROM `tb_view` WHERE user_id = ?";
+            AdminAllDTO user = jdbcTemplate.queryForObject(sql, new Object[] { authenticatedUserId }, (resultSet, rowNum) -> {
+                AdminAllDTO userDTO = new AdminAllDTO();
+                userDTO.setUser_id(resultSet.getString("user_id"));
+                userDTO.setUsername(resultSet.getString("email"));
+                userDTO.setEmail(resultSet.getString("username"));
+                userDTO.setSurname(resultSet.getString("surname"));
+                userDTO.setPhone(resultSet.getString("phone"));
+                userDTO.setVehicle_id(resultSet.getLong("vehicle_id"));
+                userDTO.setCreated_at(resultSet.getDate("created_at"));
+                userDTO.setIs_active(resultSet.getString("is_active"));
+                return userDTO;
+            });
+
+            if (user != null) {
+                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("User profile retrieved successfully.", user);
+                return ResponseEntity.ok(responseWrapper);
+            } else {
+                return ResponseEntity.notFound().build(); // Return 404 without a response body
+            }
+        } catch (JwtException e) {
+            // Token is invalid or has expired
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ResponseWrapper<>("Token is invalid.", null));
+        } catch (Exception e) {
+            // Log the error for debugging
+            e.printStackTrace();
+            String errorMessage = "An error occurred while retrieving user profile.";
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ResponseWrapper<>(errorMessage, null));
+        }
+    }
 
     @PostMapping("/user/add_subadmin")
     public ResponseEntity<ResponseWrapper<List<admin_entity>>> addNewUser(@RequestBody admin_entity req_user) {
@@ -163,6 +307,17 @@ public class admin_Controller {
                 ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Username already exists.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
+            // Check if the phone number is already registered in the database
+            String phone = req_user.getPhone();
+            admin_entity existingUserByPhone = adminRepository.findByPhone(phone);
+            System.out.println(existingUserByPhone);
+
+            if (existingUserByPhone != null) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Phone number is already registered.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+
+
 
             // Check password
             String password = req_user.getPassword();
@@ -187,6 +342,12 @@ public class admin_Controller {
                 ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one special character.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
+            // Check if the phone number contains only digits
+            if (!req_user.getPhone().matches("\\d+")) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Phone number should contain only digits.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+
 
 // Rest of your code for user creation
 
@@ -199,7 +360,7 @@ public class admin_Controller {
             String encryptedPass = bcrypt.encode(req_user.getPassword());
             req_user.setPassword(encryptedPass);
             req_user.setSecret_password(encryptedPass);
-            req_user.setPhone(encryptedPass);
+//            req_user.setPhone(encryptedPass);
 
             req_user.setIs_active("Active");
 //            user.setAddress_id(savedAddress.getAddressId().longValue());
@@ -233,7 +394,7 @@ public class admin_Controller {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
             // Check if the user with the given userId exists
-            Optional<admin_entity> existingUserOptional = adminRepository.findById(userId);
+            Optional<admin_entity> existingUserOptional = adminRepository.findById(Long.valueOf(userId));
 
             if (existingUserOptional.isEmpty()) {
                 // User not found, return an error response

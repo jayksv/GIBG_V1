@@ -5,7 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
-public interface admin_repository extends JpaRepository<admin_entity, String> {
+public interface admin_repository extends JpaRepository<admin_entity, Long> {
 //    admin_entity findByEmail(String email);
 admin_entity findByUsername(String username);
+    admin_entity findByPhone(String phone);
 }
