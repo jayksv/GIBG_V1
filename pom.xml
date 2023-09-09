@@ -98,6 +98,16 @@
 			<artifactId>cloudinary-http44</artifactId>
 			<version>1.28.0</version>
 		</dependency>
+		<dependency>
+			<groupId>io.springfox</groupId>
+			<artifactId>springfox-swagger2</artifactId>
+			<version>3.0.0</version> <!-- Use the appropriate version -->
+		</dependency>
+		<dependency>
+			<groupId>io.springfox</groupId>
+			<artifactId>springfox-boot-starter</artifactId>
+			<version>3.0.0</version> <!-- Use the appropriate version -->
+		</dependency>
 
 	</dependencies>
 

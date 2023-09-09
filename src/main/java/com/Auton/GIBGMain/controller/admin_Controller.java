@@ -160,8 +160,8 @@ public class admin_Controller {
             List<AdminAllDTO> users = jdbcTemplate.query(sql, (resultSet, rowNum) -> {
                 AdminAllDTO usersDTO = new AdminAllDTO();
                 usersDTO.setUser_id(resultSet.getString("user_id"));
-                usersDTO.setUsername(resultSet.getString("email"));
                 usersDTO.setEmail(resultSet.getString("username"));
+                usersDTO.setUsername(resultSet.getString("email"));
                 usersDTO.setSurname(resultSet.getString("surname"));
                 usersDTO.setPhone(resultSet.getString("phone"));
 //                usersDTO.setRole_name(resultSet.getString("role_name"));
@@ -390,7 +390,7 @@ System.out.println(authenticatedUserId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
-    @PutMapping("/user/update_subadmin/{userId}")
+    @PutMapping("/user/update_subadmin")
     public ResponseEntity<ResponseWrapper<admin_entity>> updateUser(
             @PathVariable String userId,
             @RequestBody admin_entity updatedUser,
