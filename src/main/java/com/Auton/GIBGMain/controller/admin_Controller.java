@@ -64,7 +64,7 @@ public class admin_Controller {
             }
 
             // Custom SQL query to retrieve SuperAdmin by username
-            String sql = "SELECT `user_id`, `username`, `password`, `surname`, `phone`, `secret_password`, `role_id`, `email` FROM `tb_users` WHERE `username` = ?";
+            String sql = "SELECT `user_id`, `username`, `password`, `first_name`, `last_name`, `datebirth`, `phone`, `secret_password`, `role_id`, `email`, `vehicle_id`, `image_profile`, `created_at`, `create_by`, `is_active`, `gender`, `address`, `shop_id` FROM `tb_users` WHERE `username` = ?";
             admin_entity superAdmin = jdbcTemplate.queryForObject(sql, new Object[]{user.getUsername()}, (resultSet, rowNum) -> {
                 admin_entity superAdminEntity = new admin_entity();
                 superAdminEntity.setUser_id(resultSet.getString("user_id"));
