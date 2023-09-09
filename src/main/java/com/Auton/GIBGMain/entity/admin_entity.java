@@ -25,14 +25,29 @@ public class admin_entity {
     @Column(name = "username", nullable = false)
     private String username;
 
-    @Column(name = "email")
-    private String email;
-
     @Column(name = "password", nullable = false)
     private String password;
 
-    @Column(name = "surname")
-    private String surname;
+    @Column(name = "email")
+    private String email;
+
+    @Column(name = "first_name")
+    private String first_name;
+
+    @Column(name = "last_name")
+    private String last_name;
+
+    @Column(name = "datebirth")
+    private String datebirth;
+
+    @Column(name = "image_profile")
+    private String image_profile;
+
+    @Column(name = "gender")
+    private String gender;
+
+    @Column(name = "address")
+    private String address;
 
     @Column(name = "phone")
     private String phone;
@@ -48,6 +63,12 @@ public class admin_entity {
 
     @Column(name = "is_active",columnDefinition = "bigint default Active")
     private String is_active;
+
+    @Column(name = "create_by")
+    private String create_by;
+
+    @Column(name = "created_at")
+    private String created_at;
 
 
 }
