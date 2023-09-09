@@ -2,9 +2,11 @@ package com.Auton.GIBGMain.controller;
 
 import com.Auton.GIBGMain.Response.ResponseWrapper;
 import com.Auton.GIBGMain.Response.adminDTO.AdminAllDTO;
+import com.Auton.GIBGMain.Response.adminDTO.userVecleDTO;
 import com.Auton.GIBGMain.entity.AdminAddressWrapper;
 import com.Auton.GIBGMain.entity.LoginResponse;
 import com.Auton.GIBGMain.entity.admin_entity;
+import com.Auton.GIBGMain.entity.user_type.userType_entity;
 import com.Auton.GIBGMain.myfuntion.IdGeneratorService;
 import com.Auton.GIBGMain.middleware.authToken;
 import com.Auton.GIBGMain.repository.admin_repository;
@@ -23,6 +25,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -39,6 +44,7 @@ public class admin_Controller {
 
     @Autowired
     private admin_repository adminRepository;
+
 
     @Value("${jwt_secret}")
     private String jwt_secret;
@@ -118,73 +124,107 @@ public class admin_Controller {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
-    @GetMapping("/user/all")
-    public ResponseEntity<ResponseWrapper<List<AdminAllDTO>>> getAllUsers( @RequestHeader("Authorization") String authorizationHeader) {
-
-
-        try {
-
-            if (authorizationHeader == null || authorizationHeader.isBlank()) {
-               ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
-            }
-            // Verify the token from the Authorization header
-            String token = authorizationHeader.substring("Bearer ".length());
-
-            Claims claims = Jwts.parser()
-                    .setSigningKey(jwt_secret) // Replace with your secret key
-                    .parseClaimsJws(token)
-                    .getBody();
-
-            // Check token expiration
-            Date expiration = claims.getExpiration();
-            if (expiration != null && expiration.before(new Date())) {
-                ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
-            }
-
-            // Extract necessary claims (you can add more as needed)
-            String authenticatedUserId = claims.get("user_id", String.class);
-            Long roleId = claims.get("role_id", Long.class);
-
-//            String role = claims.get("role_name", String.class);
-            // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
-            if (roleId !=2 ) {
-                ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
-            }
-
-
-            String sql = "SELECT *FROM `tb_view` WHERE role_id <> 1";
-
-            List<AdminAllDTO> users = jdbcTemplate.query(sql, (resultSet, rowNum) -> {
-                AdminAllDTO usersDTO = new AdminAllDTO();
-                usersDTO.setUser_id(resultSet.getString("user_id"));
-                usersDTO.setEmail(resultSet.getString("username"));
-                usersDTO.setUsername(resultSet.getString("email"));
-                usersDTO.setSurname(resultSet.getString("surname"));
-                usersDTO.setPhone(resultSet.getString("phone"));
-//                usersDTO.setRole_name(resultSet.getString("role_name"));
-                usersDTO.setVehicle_id(resultSet.getLong("vehicle_id"));
-                usersDTO.setCreated_at(resultSet.getDate("created_at"));
-                usersDTO.setIs_active(resultSet.getString("is_active"));
-                return usersDTO;
-            });
-
-            ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("User data retrieved successfully.", users);
-            return ResponseEntity.ok(responseWrapper);
-        } catch (JwtException e) {
-            // Token is invalid or has expired
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ResponseWrapper<>("Token is invalid.", null));
-        } catch (Exception e) {
-            // Log the error for debugging
-            e.printStackTrace();
-            String errorMessage = "An error occurred while retrieving user data.";
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ResponseWrapper<>(errorMessage, null));
+//    @GetMapping("/user/all")
+//    public ResponseEntity<ResponseWrapper<List<AdminAllDTO>>> getAllUsers( @RequestHeader("Authorization") String authorizationHeader) {
+//
+//
+//        try {
+//
+//            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+//               ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+//                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+//            }
+//            // Verify the token from the Authorization header
+//            String token = authorizationHeader.substring("Bearer ".length());
+//
+//            Claims claims = Jwts.parser()
+//                    .setSigningKey(jwt_secret) // Replace with your secret key
+//                    .parseClaimsJws(token)
+//                    .getBody();
+//
+//            // Check token expiration
+//            Date expiration = claims.getExpiration();
+//            if (expiration != null && expiration.before(new Date())) {
+//                ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+//                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+//            }
+//
+//            // Extract necessary claims (you can add more as needed)
+//            String authenticatedUserId = claims.get("user_id", String.class);
+//            Long roleId = claims.get("role_id", Long.class);
+//
+////            String role = claims.get("role_name", String.class);
+//            // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
+//            if (roleId !=2 ) {
+//                ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
+//                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
+//            }
+//
+//
+//            String sql = "SELECT *FROM `tb_view` WHERE role_id <> 1";
+//
+//            List<AdminAllDTO> users = jdbcTemplate.query(sql, (resultSet, rowNum) -> {
+//                AdminAllDTO usersDTO = new AdminAllDTO();
+//                usersDTO.setUser_id(resultSet.getString("user_id"));
+//                usersDTO.setEmail(resultSet.getString("username"));
+//                usersDTO.setUsername(resultSet.getString("email"));
+//                usersDTO.setSurname(resultSet.getString("surname"));
+//                usersDTO.setPhone(resultSet.getString("phone"));
+////                usersDTO.setRole_name(resultSet.getString("role_name"));
+//                usersDTO.setVehicle_id(resultSet.getLong("vehicle_id"));
+//                usersDTO.setCreated_at(resultSet.getDate("created_at"));
+//                usersDTO.setIs_active(resultSet.getString("is_active"));
+//                return usersDTO;
+//            });
+//
+//            ResponseWrapper<List<AdminAllDTO>> responseWrapper = new ResponseWrapper<>("User data retrieved successfully.", users);
+//            return ResponseEntity.ok(responseWrapper);
+//        } catch (JwtException e) {
+//            // Token is invalid or has expired
+//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+//                    .body(new ResponseWrapper<>("Token is invalid.", null));
+//        } catch (Exception e) {
+//            // Log the error for debugging
+//            e.printStackTrace();
+//            String errorMessage = "An error occurred while retrieving user data.";
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+//                    .body(new ResponseWrapper<>(errorMessage, null));
+//        }
+//    }
+@GetMapping("/user/all")
+public ResponseEntity<?> getAllUsers(@RequestHeader("Authorization") String authorizationHeader) {
+    try {
+        // Validate authorization using authService
+        ResponseEntity<ResponseWrapper<Void>> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+        if (authResponse.getStatusCode() != HttpStatus.OK) {
+            ResponseWrapper<Void> authResponseBody = authResponse.getBody();
+            return ResponseEntity.status(authResponse.getStatusCode()).body(new ResponseWrapper<>(authResponseBody.getMessage(), null));
         }
+
+
+
+        String sql ="SELECT tb_users.user_id,tb_users.username,tb_users.first_name,tb_users.last_name,tb_users.datebirth,tb_users.phone,tb_users.role_id,tb_users.email,tb_users.image_profile,tb_users.created_at,tb_users.create_by,tb_users.is_active,tb_users.gender,tb_users.address,tb_role.role_name\n" +
+                "FROM tb_users\n" +
+                "JOIN tb_role ON tb_users.role_id = tb_role.role_id\n" +
+                "WHERE tb_users.role_id =3 ";
+        List<AdminAllDTO> username = jdbcTemplate.query(sql, this::mapUserRow);
+
+        List<userVecleDTO> responses = new ArrayList<>();
+        for (AdminAllDTO user : username) {
+            List<userType_entity> usertype = findUserTypeByUserID((user.getUser_id()));
+
+
+            userVecleDTO response = new userVecleDTO("Success", user,usertype);
+            responses.add(response);
+        }
+
+        return ResponseEntity.ok(responses);
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
     }
+}
+
     @GetMapping("/user/findbyid/{userId}")
     public ResponseEntity<ResponseWrapper<AdminAllDTO>> getUserById(@RequestHeader("Authorization") String authorizationHeader, @PathVariable String userId) {
         try {
@@ -216,9 +256,9 @@ public class admin_Controller {
                 userDTO.setUser_id(resultSet.getString("user_id"));
                 userDTO.setUsername(resultSet.getString("email"));
                 userDTO.setEmail(resultSet.getString("username"));
-                userDTO.setSurname(resultSet.getString("surname"));
+//                usersDTO.setFirst_name(resultSet.getString("first_name"));
                 userDTO.setPhone(resultSet.getString("phone"));
-                userDTO.setVehicle_id(resultSet.getLong("vehicle_id"));
+                userDTO.setVehicle_id(resultSet.getString("vehicle_id"));
                 userDTO.setCreated_at(resultSet.getDate("created_at"));
                 userDTO.setIs_active(resultSet.getString("is_active"));
                 return userDTO;
@@ -276,9 +316,9 @@ System.out.println(authenticatedUserId);
                 userDTO.setUser_id(resultSet.getString("user_id"));
                 userDTO.setUsername(resultSet.getString("email"));
                 userDTO.setEmail(resultSet.getString("username"));
-                userDTO.setSurname(resultSet.getString("surname"));
+//                usersDTO.setFirst_name(resultSet.getString("first_name"));
                 userDTO.setPhone(resultSet.getString("phone"));
-                userDTO.setVehicle_id(resultSet.getLong("vehicle_id"));
+                userDTO.setVehicle_id(resultSet.getString("vehicle_id"));
                 userDTO.setCreated_at(resultSet.getDate("created_at"));
                 userDTO.setIs_active(resultSet.getString("is_active"));
                 return userDTO;
@@ -465,5 +505,38 @@ System.out.println(authenticatedUserId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+
+    private AdminAllDTO mapUserRow(ResultSet rs, int rowNum) throws SQLException {
+        AdminAllDTO usersDTO = new AdminAllDTO();
+                usersDTO.setUser_id(rs.getString("user_id"));
+                usersDTO.setEmail(rs.getString("username"));
+                usersDTO.setUsername(rs.getString("username"));
+                usersDTO.setFirst_name(rs.getString("first_name"));
+                usersDTO.setPhone(rs.getString("phone"));
+                usersDTO.setDatebirth(rs.getString("datebirth"));
+                usersDTO.setImage_profile(rs.getString("image_profile"));
+                usersDTO.setCreated_at(rs.getDate("created_at"));
+                usersDTO.setCreate_by(rs.getLong("create_by"));
+                usersDTO.setIs_active(rs.getString("is_active"));
+        usersDTO.setGender(rs.getString("gender"));
+        usersDTO.setAddress(rs.getString("address"));
+
+                return usersDTO;
+
+    }
+
+    private List<userType_entity> findUserTypeByUserID(String userId) {
+        String sql = "SELECT * FROM `tb_user_vicle` WHERE user_id = ?";
+        return jdbcTemplate.query(sql, this::mapUsertypeRow, userId);
+    }
+    private userType_entity mapUsertypeRow(ResultSet rs, int rowNum) throws SQLException {
+        userType_entity color = new userType_entity();
+        color.setUser_vicle_id(rs.getLong("user_vicle_id "));
+        color.setUser_id(rs.getString("user_id"));
+        color.setVehicle_id(rs.getLong("vehicle_id"));
+
+        return color;
+    }
+
 
 }
