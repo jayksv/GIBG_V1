@@ -1,6 +1,7 @@
 package com.Auton.GIBGMain.controller;
 
 import com.Auton.GIBGMain.Response.ResponseWrapper;
+import com.Auton.GIBGMain.Response.VehicleDTO;
 import com.Auton.GIBGMain.Response.adminDTO.AdminAllDTO;
 import com.Auton.GIBGMain.Response.adminDTO.userVecleDTO;
 import com.Auton.GIBGMain.entity.AdminAddressWrapper;
@@ -191,6 +192,39 @@ public class admin_Controller {
 //                    .body(new ResponseWrapper<>(errorMessage, null));
 //        }
 //    }
+@GetMapping("/admin/all")
+public ResponseEntity<?> getAllAdmin(@RequestHeader("Authorization") String authorizationHeader) {
+    try {
+        // Validate authorization using authService
+        ResponseEntity<ResponseWrapper<Void>> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+        if (authResponse.getStatusCode() != HttpStatus.OK) {
+            ResponseWrapper<Void> authResponseBody = authResponse.getBody();
+            return ResponseEntity.status(authResponse.getStatusCode()).body(new ResponseWrapper<>(authResponseBody.getMessage(), null));
+        }
+
+
+
+        String sql ="SELECT tb_users.user_id,tb_users.username,tb_users.first_name,tb_users.last_name,tb_users.datebirth,tb_users.phone,tb_users.role_id,tb_users.email,tb_users.image_profile,tb_users.created_at,tb_users.create_by,tb_users.is_active,tb_users.gender,tb_users.address,tb_role.role_name\n" +
+                "FROM tb_users\n" +
+                "JOIN tb_role ON tb_users.role_id = tb_role.role_id\n" +
+                "WHERE tb_users.role_id =2";
+        List<AdminAllDTO> username = jdbcTemplate.query(sql, this::mapUserRow);
+
+        List<userVecleDTO> responses = new ArrayList<>();
+        for (AdminAllDTO user : username) {
+            List<VehicleDTO> usertype = findUserTypeByUserID((user.getUser_id()));
+
+
+            userVecleDTO response = new userVecleDTO("Success", user,usertype);
+            responses.add(response);
+        }
+
+        return ResponseEntity.ok(responses);
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+    }
+}
 @GetMapping("/user/all")
 public ResponseEntity<?> getAllUsers(@RequestHeader("Authorization") String authorizationHeader) {
     try {
@@ -206,12 +240,12 @@ public ResponseEntity<?> getAllUsers(@RequestHeader("Authorization") String auth
         String sql ="SELECT tb_users.user_id,tb_users.username,tb_users.first_name,tb_users.last_name,tb_users.datebirth,tb_users.phone,tb_users.role_id,tb_users.email,tb_users.image_profile,tb_users.created_at,tb_users.create_by,tb_users.is_active,tb_users.gender,tb_users.address,tb_role.role_name\n" +
                 "FROM tb_users\n" +
                 "JOIN tb_role ON tb_users.role_id = tb_role.role_id\n" +
-                "WHERE tb_users.role_id =3 ";
+                "WHERE tb_users.role_id =3";
         List<AdminAllDTO> username = jdbcTemplate.query(sql, this::mapUserRow);
 
         List<userVecleDTO> responses = new ArrayList<>();
         for (AdminAllDTO user : username) {
-            List<userType_entity> usertype = findUserTypeByUserID((user.getUser_id()));
+            List<VehicleDTO> usertype = findUserTypeByUserID((user.getUser_id()));
 
 
             userVecleDTO response = new userVecleDTO("Success", user,usertype);
@@ -250,15 +284,15 @@ public ResponseEntity<?> getAllUsers(@RequestHeader("Authorization") String auth
 
 
             // Query the user by ID
-            String sql = "SELECT * FROM `tb_view` WHERE user_id = ?";
+            String sql = "SELECT * FROM `gibg_view` WHERE user_id = ?";
             AdminAllDTO user = jdbcTemplate.queryForObject(sql, new Object[] { userId }, (resultSet, rowNum) -> {
                 AdminAllDTO userDTO = new AdminAllDTO();
                 userDTO.setUser_id(resultSet.getString("user_id"));
-                userDTO.setUsername(resultSet.getString("email"));
-                userDTO.setEmail(resultSet.getString("username"));
+                userDTO.setUsername(resultSet.getString("username"));
+                userDTO.setEmail(resultSet.getString("email"));
 //                usersDTO.setFirst_name(resultSet.getString("first_name"));
                 userDTO.setPhone(resultSet.getString("phone"));
-                userDTO.setVehicle_id(resultSet.getString("vehicle_id"));
+//                userDTO.setVehicle_id(resultSet.getString("vehicle_id"));
                 userDTO.setCreated_at(resultSet.getDate("created_at"));
                 userDTO.setIs_active(resultSet.getString("is_active"));
                 return userDTO;
@@ -310,15 +344,15 @@ public ResponseEntity<?> getAllUsers(@RequestHeader("Authorization") String auth
 
 System.out.println(authenticatedUserId);
             // Query the user by ID
-            String sql = "SELECT * FROM `tb_view` WHERE user_id = ?";
+            String sql = "SELECT * FROM `gibg_view` WHERE user_id = ?";
             AdminAllDTO user = jdbcTemplate.queryForObject(sql, new Object[] { authenticatedUserId }, (resultSet, rowNum) -> {
                 AdminAllDTO userDTO = new AdminAllDTO();
                 userDTO.setUser_id(resultSet.getString("user_id"));
-                userDTO.setUsername(resultSet.getString("email"));
-                userDTO.setEmail(resultSet.getString("username"));
+                userDTO.setUsername(resultSet.getString("username"));
+                userDTO.setEmail(resultSet.getString("email"));
 //                usersDTO.setFirst_name(resultSet.getString("first_name"));
                 userDTO.setPhone(resultSet.getString("phone"));
-                userDTO.setVehicle_id(resultSet.getString("vehicle_id"));
+//                userDTO.setVehicle_id(resultSet.getString("vehicle_id"));
                 userDTO.setCreated_at(resultSet.getDate("created_at"));
                 userDTO.setIs_active(resultSet.getString("is_active"));
                 return userDTO;
@@ -509,7 +543,7 @@ System.out.println(authenticatedUserId);
     private AdminAllDTO mapUserRow(ResultSet rs, int rowNum) throws SQLException {
         AdminAllDTO usersDTO = new AdminAllDTO();
                 usersDTO.setUser_id(rs.getString("user_id"));
-                usersDTO.setEmail(rs.getString("username"));
+                usersDTO.setEmail(rs.getString("email"));
                 usersDTO.setUsername(rs.getString("username"));
                 usersDTO.setFirst_name(rs.getString("first_name"));
                 usersDTO.setPhone(rs.getString("phone"));
@@ -525,17 +559,29 @@ System.out.println(authenticatedUserId);
 
     }
 
-    private List<userType_entity> findUserTypeByUserID(String userId) {
-        String sql = "SELECT * FROM `tb_user_vicle` WHERE user_id = ?";
+    private List<VehicleDTO> findUserTypeByUserID(String userId) {
+        String sql = "SELECT uv.`user_vicle_id`, uv.`user_id`, uv.`license_plate`, uv.`create_at`, v.`Vehicle_type`, v.`Manufacturer`, v.`Vehicle_type_name`, v.`vehicle_year`, v.`fuel`, v.`exhast_cc`, v.`color_vehicle`, v.`first_registration`, v.`vehicle_stand_number`, v.`date_of_vehicle`, v.`Classification_of_vehicle_type`, v.`Final_inspection_date` FROM `tb_user_vicle` uv JOIN `tb_vehicles` v ON uv.`license_plate` = v.`license_plate` WHERE uv.user_id = ?";
         return jdbcTemplate.query(sql, this::mapUsertypeRow, userId);
     }
-    private userType_entity mapUsertypeRow(ResultSet rs, int rowNum) throws SQLException {
-        userType_entity color = new userType_entity();
-        color.setUser_vicle_id(rs.getLong("user_vicle_id "));
-        color.setUser_id(rs.getString("user_id"));
-        color.setVehicle_id(rs.getLong("vehicle_id"));
+    private VehicleDTO mapUsertypeRow(ResultSet rs, int rowNum) throws SQLException {
+        VehicleDTO userType = new VehicleDTO();
+        userType.setUser_vicle_id(rs.getLong("user_vicle_id"));
+        userType.setUser_id(rs.getString("user_id"));
+        userType.setLicense_plate(rs.getString("license_plate"));
+        userType.setVehicle_type(rs.getString("Vehicle_type"));
+        userType.setManufacturer(rs.getString("Manufacturer"));
+        userType.setVehicle_type_name(rs.getString("Vehicle_type_name"));
+        userType.setVehicle_year(rs.getString("vehicle_year"));
+        userType.setFuel(rs.getString("fuel"));
+        userType.setExhast_cc(rs.getString("exhast_cc"));
+        userType.setColor_vehicle(rs.getString("color_vehicle"));
+        userType.setFirst_registration(rs.getString("first_registration"));
+        userType.setVehicle_stand_number(rs.getString("vehicle_stand_number"));
+        userType.setDate_of_vehicle(rs.getString("date_of_vehicle"));
+        userType.setClassification_of_vehicle_type(rs.getString("Classification_of_vehicle_type"));
+        userType.setFinal_inspection_date(rs.getString("Final_inspection_date"));
 
-        return color;
+        return userType;
     }
 
 

@@ -20,7 +20,7 @@ public class AdminAllDTO {
     private String last_name;
     private String datebirth;
     private String phone;
-    private String vehicle_id;
+//    private String vehicle_id;
     private String image_profile;
     private Long create_by;
     private Date created_at;
@@ -28,4 +28,5 @@ public class AdminAllDTO {
     private String gender;
     private String address;
     private String shop_id;
+//    private Long user_vicle_id ;
 }

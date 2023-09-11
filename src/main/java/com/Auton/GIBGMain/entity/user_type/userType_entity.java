@@ -21,6 +21,6 @@ public class userType_entity {
     @Column(name = "user_id")
     private String user_id;
 
-    @Column(name = "vehicle_id")
-    private Long vehicle_id;
+    @Column(name = "license_plate ")
+    private String license_plate ;
 }

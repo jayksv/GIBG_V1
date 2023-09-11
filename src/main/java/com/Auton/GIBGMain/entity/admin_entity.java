@@ -58,8 +58,8 @@ public class admin_entity {
     @Column(name = "role_id", columnDefinition = "bigint default 4")
     private Long role_id;
 
-    @Column(name = "vehicle_id")
-    private Long vehicle_id;
+//    @Column(name = "license_plate")
+//    private Long license_plate;
 
     @Column(name = "is_active",columnDefinition = "bigint default Active")
     private String is_active;
@@ -70,5 +70,7 @@ public class admin_entity {
     @Column(name = "created_at")
     private String created_at;
 
+    @Column(name = "user_vicle_id ")
+    private Long user_vicle_id ;
 
 }

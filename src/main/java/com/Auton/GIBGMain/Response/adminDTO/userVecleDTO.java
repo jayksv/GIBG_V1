@@ -1,5 +1,6 @@
 package com.Auton.GIBGMain.Response.adminDTO;
 
+import com.Auton.GIBGMain.Response.VehicleDTO;
 import com.Auton.GIBGMain.entity.user_type.userType_entity;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -15,5 +16,6 @@ import java.util.List;
 public class userVecleDTO {
     private String message;
     private AdminAllDTO username;
-    private List<userType_entity> usertype;
+    private List<VehicleDTO> usertype;
+
 }
