@@ -1,4 +1,4 @@
-package com.Auton.GIBGMain.Response;
+package com.Auton.GIBGMain.Response.userVecleDTO;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

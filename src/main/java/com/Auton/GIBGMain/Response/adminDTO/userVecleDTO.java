@@ -1,7 +1,6 @@
 package com.Auton.GIBGMain.Response.adminDTO;
 
-import com.Auton.GIBGMain.Response.VehicleDTO;
-import com.Auton.GIBGMain.entity.user_type.userType_entity;
+import com.Auton.GIBGMain.Response.userVecleDTO.VehicleDTO;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

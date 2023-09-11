@@ -1,13 +1,11 @@
 package com.Auton.GIBGMain.controller;
 
 import com.Auton.GIBGMain.Response.ResponseWrapper;
-import com.Auton.GIBGMain.Response.VehicleDTO;
+import com.Auton.GIBGMain.Response.userVecleDTO.VehicleDTO;
 import com.Auton.GIBGMain.Response.adminDTO.AdminAllDTO;
 import com.Auton.GIBGMain.Response.adminDTO.userVecleDTO;
-import com.Auton.GIBGMain.entity.AdminAddressWrapper;
 import com.Auton.GIBGMain.entity.LoginResponse;
 import com.Auton.GIBGMain.entity.admin_entity;
-import com.Auton.GIBGMain.entity.user_type.userType_entity;
 import com.Auton.GIBGMain.myfuntion.IdGeneratorService;
 import com.Auton.GIBGMain.middleware.authToken;
 import com.Auton.GIBGMain.repository.admin_repository;
@@ -23,7 +21,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.sql.ResultSet;
@@ -31,7 +28,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/admin")
