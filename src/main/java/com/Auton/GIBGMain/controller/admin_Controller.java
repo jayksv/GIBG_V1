@@ -67,7 +67,7 @@ public class admin_Controller {
             }
 
             // Custom SQL query to retrieve SuperAdmin by username
-            String sql = "SELECT `user_id`, `username`, `password`, `first_name`, `last_name`, `datebirth`, `phone`, `secret_password`, `role_id`, `email`, `vehicle_id`, `image_profile`, `created_at`, `create_by`, `is_active`, `gender`, `address`, `shop_id` FROM `tb_users` WHERE `username` = ?";
+            String sql = "SELECT `user_id`, `username`, `password`, `first_name`, `last_name`, `datebirth`, `phone`, `secret_password`, `role_id`, `email`, `image_profile`, `created_at`, `create_by`, `is_active`, `gender`, `address`, `shop_id` FROM `tb_users` WHERE `username` = ?";
             admin_entity superAdmin = jdbcTemplate.queryForObject(sql, new Object[]{user.getUsername()}, (resultSet, rowNum) -> {
                 admin_entity superAdminEntity = new admin_entity();
                 superAdminEntity.setUser_id(resultSet.getString("user_id"));
@@ -460,6 +460,90 @@ System.out.println(authenticatedUserId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+    @PostMapping("/user/general")
+    public ResponseEntity<ResponseWrapper<List<admin_entity>>> addNewUserGeneral(@RequestBody admin_entity req_user) {
+        try {
+            // Check if the username already exists
+            admin_entity existingUser = adminRepository.findByUsername(req_user.getUsername());
+
+            if (existingUser != null) {
+                // Username already exists, return an error response
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Username already exists.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            // Check if the phone number is already registered in the database
+            String phone = req_user.getPhone();
+            admin_entity existingUserByPhone = adminRepository.findByPhone(phone);
+            System.out.println(existingUserByPhone);
+
+            if (existingUserByPhone != null) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Phone number is already registered.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+
+
+
+            // Check password
+            String password = req_user.getPassword();
+
+            if (password.length() < 8) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should be at least 8 characters long.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            if (!password.matches(".*[a-z].*")) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one lowercase letter.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            if (!password.matches(".*[A-Z].*")) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one uppercase letter.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            if (!password.matches(".*\\d.*")) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one digit.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            if (!password.matches(".*[@#$%^&+=].*")) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one special character.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            // Check if the phone number contains only digits
+            if (!req_user.getPhone().matches("\\d+")) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Phone number should contain only digits.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+
+
+// Rest of your code for user creation
+
+
+            // Generate a unique user_id
+            String userId = generateUserId.generateUserId();
+            req_user.setUser_id(userId);
+
+            BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
+            String encryptedPass = bcrypt.encode(req_user.getPassword());
+            req_user.setPassword(encryptedPass);
+            req_user.setSecret_password(encryptedPass);
+//            req_user.setPhone(encryptedPass);
+
+            req_user.setIs_active("Active");
+//            user.setAddress_id(savedAddress.getAddressId().longValue());
+            req_user.setRole_id((long) 3);
+
+            admin_entity savedUser = adminRepository.save(req_user);
+
+            ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Insert new user and address successful", null);
+            return ResponseEntity.ok(responseWrapper);
+
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            String errorMessage = "An error occurred while adding a new user.";
+            ResponseWrapper<List<admin_entity>> errorResponse = new ResponseWrapper<>(errorMessage, null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
     @PutMapping("/user/update_subadmin")
     public ResponseEntity<ResponseWrapper<admin_entity>> updateUser(
             @PathVariable String userId,
@@ -500,6 +584,7 @@ System.out.println(authenticatedUserId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+
     @DeleteMapping("/user/delete/{userId}")
     public ResponseEntity<ResponseWrapper<String>> deleteUser(
             @PathVariable String userId,
