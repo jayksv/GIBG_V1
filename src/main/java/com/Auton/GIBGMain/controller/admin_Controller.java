@@ -255,63 +255,92 @@ public ResponseEntity<?> getAllUsers(@RequestHeader("Authorization") String auth
     }
 }
 
-    @GetMapping("/user/findbyid/{userId}")
-    public ResponseEntity<ResponseWrapper<AdminAllDTO>> getUserById(@RequestHeader("Authorization") String authorizationHeader, @PathVariable String userId) {
-        try {
-            if (authorizationHeader == null || authorizationHeader.isBlank()) {
-                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
-            }
+//    @GetMapping("/user/findbyid/{userId}")
+//    public ResponseEntity<ResponseWrapper<AdminAllDTO>> getUserById(@RequestHeader("Authorization") String authorizationHeader, @PathVariable String userId) {
+//        try {
+//            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+//                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+//                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+//            }
+//
+//            // Verify the token from the Authorization header
+//            String token = authorizationHeader.substring("Bearer ".length());
+//
+//            Claims claims = Jwts.parser()
+//                    .setSigningKey(jwt_secret) // Replace with your secret key
+//                    .parseClaimsJws(token)
+//                    .getBody();
+//
+//            // Check token expiration
+//            Date expiration = claims.getExpiration();
+//            if (expiration != null && expiration.before(new Date())) {
+//                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+//                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+//            }
+//
+//
+//            // Query the user by ID
+//            String sql = "SELECT * FROM `gibg_view` WHERE user_id = ?";
+//            AdminAllDTO user = jdbcTemplate.queryForObject(sql, new Object[] { userId }, (resultSet, rowNum) -> {
+//                AdminAllDTO userDTO = new AdminAllDTO();
+//                userDTO.setUser_id(resultSet.getString("user_id"));
+//                userDTO.setUsername(resultSet.getString("username"));
+//                userDTO.setEmail(resultSet.getString("email"));
+////                usersDTO.setFirst_name(resultSet.getString("first_name"));
+//                userDTO.setPhone(resultSet.getString("phone"));
+////                userDTO.setVehicle_id(resultSet.getString("vehicle_id"));
+//                userDTO.setCreated_at(resultSet.getDate("created_at"));
+//                userDTO.setIs_active(resultSet.getString("is_active"));
+//                return userDTO;
+//            });
+//
+//            if (user != null) {
+//                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("User found by ID.", user);
+//                return ResponseEntity.ok(responseWrapper);
+//            } else {
+//                return ResponseEntity.notFound().build(); // Return 404 without a response body
+//            }
+//        } catch (JwtException e) {
+//            // Token is invalid or has expired
+//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+//                    .body(new ResponseWrapper<>("Token is invalid.", null));
+//        } catch (Exception e) {
+//            // Log the error for debugging
+//            e.printStackTrace();
+//            String errorMessage = "An error occurred while retrieving user data by ID.";
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+//                    .body(new ResponseWrapper<>(errorMessage, null));
+//        }
+//    }
+@GetMapping("/user/findByid/{userId}")
+public ResponseEntity<?> getUserById(@PathVariable String userId) {
+    try {
+        // Validate authorization using authService
+//        ResponseEntity<ResponseWrapper<Void>> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+//        if (authResponse.getStatusCode() != HttpStatus.OK) {
+//            ResponseWrapper<Void> authResponseBody = authResponse.getBody();
+//            return ResponseEntity.status(authResponse.getStatusCode()).body(new ResponseWrapper<>(authResponseBody.getMessage(), null));
+//        }
 
-            // Verify the token from the Authorization header
-            String token = authorizationHeader.substring("Bearer ".length());
+        String sql = "SELECT tb_users.user_id, tb_users.username, tb_users.first_name, tb_users.last_name, tb_users.datebirth, tb_users.phone, tb_users.role_id, tb_users.email, tb_users.image_profile, tb_users.created_at, tb_users.create_by, tb_users.is_active, tb_users.gender, tb_users.address, tb_role.role_name " +
+                "FROM tb_users " +
+                "JOIN tb_role ON tb_users.role_id = tb_role.role_id " +
+                "WHERE tb_users.role_id = 3 AND tb_users.user_id = ?";
+        AdminAllDTO user = jdbcTemplate.queryForObject(sql, this::mapUserRow, userId);
 
-            Claims claims = Jwts.parser()
-                    .setSigningKey(jwt_secret) // Replace with your secret key
-                    .parseClaimsJws(token)
-                    .getBody();
-
-            // Check token expiration
-            Date expiration = claims.getExpiration();
-            if (expiration != null && expiration.before(new Date())) {
-                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
-            }
-
-
-            // Query the user by ID
-            String sql = "SELECT * FROM `gibg_view` WHERE user_id = ?";
-            AdminAllDTO user = jdbcTemplate.queryForObject(sql, new Object[] { userId }, (resultSet, rowNum) -> {
-                AdminAllDTO userDTO = new AdminAllDTO();
-                userDTO.setUser_id(resultSet.getString("user_id"));
-                userDTO.setUsername(resultSet.getString("username"));
-                userDTO.setEmail(resultSet.getString("email"));
-//                usersDTO.setFirst_name(resultSet.getString("first_name"));
-                userDTO.setPhone(resultSet.getString("phone"));
-//                userDTO.setVehicle_id(resultSet.getString("vehicle_id"));
-                userDTO.setCreated_at(resultSet.getDate("created_at"));
-                userDTO.setIs_active(resultSet.getString("is_active"));
-                return userDTO;
-            });
-
-            if (user != null) {
-                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("User found by ID.", user);
-                return ResponseEntity.ok(responseWrapper);
-            } else {
-                return ResponseEntity.notFound().build(); // Return 404 without a response body
-            }
-        } catch (JwtException e) {
-            // Token is invalid or has expired
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ResponseWrapper<>("Token is invalid.", null));
-        } catch (Exception e) {
-            // Log the error for debugging
-            e.printStackTrace();
-            String errorMessage = "An error occurred while retrieving user data by ID.";
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ResponseWrapper<>(errorMessage, null));
+        if (user != null) {
+            List<VehicleDTO> usertype = findUserTypeByUserID(user.getUser_id());
+            userVecleDTO response = new userVecleDTO("Success", user, usertype);
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseWrapper<>("User not found", null));
         }
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
     }
+}
+
     @PostMapping("/user/profile")
     public ResponseEntity<ResponseWrapper<AdminAllDTO>> getUserProfile(@RequestHeader("Authorization") String authorizationHeader) {
         try {
