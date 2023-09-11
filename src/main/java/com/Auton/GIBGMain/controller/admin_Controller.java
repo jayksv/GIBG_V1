@@ -1,11 +1,13 @@
 package com.Auton.GIBGMain.controller;
 
 import com.Auton.GIBGMain.Response.ResponseWrapper;
+import com.Auton.GIBGMain.Response.adminDTO.adminRequest;
 import com.Auton.GIBGMain.Response.userVecleDTO.VehicleDTO;
 import com.Auton.GIBGMain.Response.adminDTO.AdminAllDTO;
 import com.Auton.GIBGMain.Response.adminDTO.userVecleDTO;
 import com.Auton.GIBGMain.entity.LoginResponse;
 import com.Auton.GIBGMain.entity.admin_entity;
+import com.Auton.GIBGMain.entity.vehicle_entity.vehicle_entity;
 import com.Auton.GIBGMain.myfuntion.IdGeneratorService;
 import com.Auton.GIBGMain.middleware.authToken;
 import com.Auton.GIBGMain.repository.admin_repository;
@@ -22,6 +24,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -404,80 +407,141 @@ System.out.println(authenticatedUserId);
                     .body(new ResponseWrapper<>(errorMessage, null));
         }
     }
+    @PutMapping("/user/profile/update")
+    public ResponseEntity<ResponseWrapper<AdminAllDTO>> updateUserProfile(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestBody AdminAllDTO updatedUserProfile) {
+        try {
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            // Extract necessary claims (you can add more as needed)
+            String authenticatedUserId = claims.get("user_id", String.class);
+
+            // Update the user's profile in the database
+            String sql = "UPDATE `gibg_view` SET username = ?, email = ?, phone = ? WHERE user_id = ?";
+            int updatedRows = jdbcTemplate.update(sql,
+                    updatedUserProfile.getUsername(),
+                    updatedUserProfile.getEmail(),
+                    updatedUserProfile.getPhone(),
+                    updatedUserProfile.getFirst_name(),
+                    updatedUserProfile.getLast_name(),
+                    updatedUserProfile.getDatebirth(),
+                    updatedUserProfile.getImage_profile(),
+                    updatedUserProfile.getGender(),
+                    updatedUserProfile.getAddress(),
+                    authenticatedUserId);
+
+            if (updatedRows > 0) {
+                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("User profile updated successfully.", updatedUserProfile);
+                return ResponseEntity.ok(responseWrapper);
+            } else {
+                return ResponseEntity.notFound().build(); // Return 404 without a response body
+            }
+        } catch (JwtException e) {
+            // Log the exception to see the details
+            e.printStackTrace();
+            String errorMessage = "Token is invalid.";
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ResponseWrapper<>(errorMessage, null));
+        } catch (Exception e) {
+            // Log the error for debugging
+            e.printStackTrace();
+            String errorMessage = "An error occurred while updating user profile.";
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ResponseWrapper<>(errorMessage, null));
+        }
+    }
+
 
     @PostMapping("/user/add_subadmin")
-    public ResponseEntity<ResponseWrapper<List<admin_entity>>> addNewUser(@RequestBody admin_entity req_user) {
+    public ResponseEntity<ResponseWrapper<String>> addNewUser(@RequestBody adminRequest req_user) {
         try {
+                admin_entity admin = req_user.getAdmin();
+                List<vehicle_entity> vehicle = req_user.getVehicle();
             // Check if the username already exists
-            admin_entity existingUser = adminRepository.findByUsername(req_user.getUsername());
+            admin_entity existingUser = adminRepository.findByUsername(admin.getUsername());
 
             if (existingUser != null) {
                 // Username already exists, return an error response
-                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Username already exists.", null);
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Username already exists.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
             // Check if the phone number is already registered in the database
-            String phone = req_user.getPhone();
+            String phone = admin.getPhone();
             admin_entity existingUserByPhone = adminRepository.findByPhone(phone);
             System.out.println(existingUserByPhone);
 
             if (existingUserByPhone != null) {
-                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Phone number is already registered.", null);
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Phone number is already registered.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
 
 
 
             // Check password
-            String password = req_user.getPassword();
+            String password = admin.getPassword();
 
             if (password.length() < 8) {
-                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should be at least 8 characters long.", null);
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Password should be at least 8 characters long.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
             if (!password.matches(".*[a-z].*")) {
-                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one lowercase letter.", null);
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Password should contain at least one lowercase letter.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
             if (!password.matches(".*[A-Z].*")) {
-                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one uppercase letter.", null);
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Password should contain at least one uppercase letter.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
             if (!password.matches(".*\\d.*")) {
-                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one digit.", null);
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Password should contain at least one digit.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
             if (!password.matches(".*[@#$%^&+=].*")) {
-                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one special character.", null);
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Password should contain at least one special character.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
             // Check if the phone number contains only digits
-            if (!req_user.getPhone().matches("\\d+")) {
-                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Phone number should contain only digits.", null);
+            if (!admin.getPhone().matches("\\d+")) {
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Phone number should contain only digits.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
-
-
 // Rest of your code for user creation
-
-
             // Generate a unique user_id
             String userId = generateUserId.generateUserId();
-            req_user.setUser_id(userId);
+            admin.setUser_id(userId);
 
             BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
-            String encryptedPass = bcrypt.encode(req_user.getPassword());
-            req_user.setPassword(encryptedPass);
-            req_user.setSecret_password(encryptedPass);
+            String encryptedPass = bcrypt.encode(admin.getPassword());
+            admin.setPassword(encryptedPass);
+            admin.setSecret_password(encryptedPass);
 //            req_user.setPhone(encryptedPass);
 
-            req_user.setIs_active("Active");
+            admin.setIs_active("Active");
 //            user.setAddress_id(savedAddress.getAddressId().longValue());
-            req_user.setRole_id((long) 2);
+            admin.setRole_id((long) 2);
 
-                admin_entity savedUser = adminRepository.save(req_user);
+                admin_entity savedUser = adminRepository.save(admin);
 
-                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Insert new user and address successful", null);
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Insert new user and address successful", null);
                 return ResponseEntity.ok(responseWrapper);
 
 
@@ -485,7 +549,7 @@ System.out.println(authenticatedUserId);
         } catch (Exception e) {
             e.printStackTrace();
             String errorMessage = "An error occurred while adding a new user.";
-            ResponseWrapper<List<admin_entity>> errorResponse = new ResponseWrapper<>(errorMessage, null);
+            ResponseWrapper<String> errorResponse = new ResponseWrapper<>(errorMessage, null);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
@@ -573,19 +637,19 @@ System.out.println(authenticatedUserId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
-    @PutMapping("/user/update_subadmin")
+    @PutMapping("/user/update_subadmin/{userId}") // Include {userId} in the URL path
     public ResponseEntity<ResponseWrapper<admin_entity>> updateUser(
-            @PathVariable String userId,
+            @PathVariable String userId, // Add @PathVariable for userId
             @RequestBody admin_entity updatedUser,
             @RequestHeader("Authorization") String authorizationHeader) {
         try {
             // Validate authorization using authService
-            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
-            if (authResponse.getStatusCode() != HttpStatus.OK) {
-                // Token is invalid or has expired
-                ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
-            }
+//            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+//            if (authResponse.getStatusCode() != HttpStatus.OK) {
+//                // Token is invalid or has expired
+//                ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
+//                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+//            }
             // Check if the user with the given userId exists
             admin_entity existingUser = adminRepository.findByUserId(userId);
 
@@ -598,6 +662,13 @@ System.out.println(authenticatedUserId);
             // Update the user entity with the new data
             existingUser.setUsername(updatedUser.getUsername());
             existingUser.setEmail(updatedUser.getEmail());
+            existingUser.setFirst_name(updatedUser.getFirst_name());
+            existingUser.setLast_name(updatedUser.getLast_name());
+            existingUser.setDatebirth(updatedUser.getDatebirth());
+//            existingUser.setSecret_password(updatedUser.getSecret_password());
+            existingUser.setImage_profile(updatedUser.getImage_profile());
+            existingUser.setGender(updatedUser.getGender());
+            existingUser.setAddress(updatedUser.getAddress());
             // Update other fields as needed
 
             // Save the updated user entity
@@ -613,6 +684,7 @@ System.out.println(authenticatedUserId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+
 
     @DeleteMapping("/user/delete/{userId}")
     public ResponseEntity<ResponseWrapper<String>> deleteUser(
