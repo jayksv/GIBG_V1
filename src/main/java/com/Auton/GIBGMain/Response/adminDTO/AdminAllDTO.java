@@ -20,7 +20,7 @@ public class AdminAllDTO {
     private String last_name;
     private String datebirth;
     private String phone;
-//    private String vehicle_id;
+    private String secret_password;
     private String image_profile;
     private Long create_by;
     private Date created_at;

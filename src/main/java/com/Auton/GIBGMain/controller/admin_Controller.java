@@ -208,7 +208,7 @@ public ResponseEntity<?> getAllAdmin(@RequestHeader("Authorization") String auth
 
 
 
-        String sql ="SELECT tb_users.user_id,tb_users.username,tb_users.first_name,tb_users.last_name,tb_users.datebirth,tb_users.phone,tb_users.role_id,tb_users.email,tb_users.image_profile,tb_users.created_at,tb_users.create_by,tb_users.is_active,tb_users.gender,tb_users.address,tb_role.role_name\n" +
+        String sql ="SELECT tb_users.user_id,tb_users.username,tb_users.first_name,tb_users.last_name,tb_users.datebirth,tb_users.secret_password,tb_users.phone,tb_users.role_id,tb_users.email,tb_users.image_profile,tb_users.created_at,tb_users.create_by,tb_users.is_active,tb_users.gender,tb_users.address,tb_role.role_name\n" +
                 "FROM tb_users\n" +
                 "JOIN tb_role ON tb_users.role_id = tb_role.role_id\n" +
                 "WHERE tb_users.role_id =2";
@@ -241,7 +241,7 @@ public ResponseEntity<?> getAllUsers(@RequestHeader("Authorization") String auth
 
 
 
-        String sql ="SELECT tb_users.user_id,tb_users.username,tb_users.first_name,tb_users.last_name,tb_users.datebirth,tb_users.phone,tb_users.role_id,tb_users.email,tb_users.image_profile,tb_users.created_at,tb_users.create_by,tb_users.is_active,tb_users.gender,tb_users.address,tb_role.role_name\n" +
+        String sql ="SELECT tb_users.user_id,tb_users.username,tb_users.first_name,tb_users.last_name,tb_users.datebirth,tb_users.secret_password,tb_users.phone,tb_users.role_id,tb_users.email,tb_users.image_profile,tb_users.created_at,tb_users.create_by,tb_users.is_active,tb_users.gender,tb_users.address,tb_role.role_name\n" +
                 "FROM tb_users\n" +
                 "JOIN tb_role ON tb_users.role_id = tb_role.role_id\n" +
                 "WHERE tb_users.role_id =3";
@@ -320,21 +320,39 @@ public ResponseEntity<?> getAllUsers(@RequestHeader("Authorization") String auth
 //                    .body(new ResponseWrapper<>(errorMessage, null));
 //        }
 //    }
-@GetMapping("/user/findByid/{userId}")
-public ResponseEntity<?> getUserById(@PathVariable String userId) {
+@GetMapping("/user/findByid")
+public ResponseEntity<?> getUserById(@RequestHeader("Authorization") String authorizationHeader) {
     try {
-        // Validate authorization using authService
-//        ResponseEntity<ResponseWrapper<Void>> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
-//        if (authResponse.getStatusCode() != HttpStatus.OK) {
-//            ResponseWrapper<Void> authResponseBody = authResponse.getBody();
-//            return ResponseEntity.status(authResponse.getStatusCode()).body(new ResponseWrapper<>(authResponseBody.getMessage(), null));
-//        }
+        if (authorizationHeader == null || authorizationHeader.isBlank()) {
+            // ถ้าหัวข้อ "Authorization" ว่างหรือไม่มีอยู่ในคำขอ
+            // สร้างข้อความผิดพลาดและส่งคำขอไม่อนุญาต
+            ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+        }
 
-        String sql = "SELECT tb_users.user_id, tb_users.username, tb_users.first_name, tb_users.last_name, tb_users.datebirth, tb_users.phone, tb_users.role_id, tb_users.email, tb_users.image_profile, tb_users.created_at, tb_users.create_by, tb_users.is_active, tb_users.gender, tb_users.address, tb_role.role_name " +
+        // ตรวจสอบความถูกต้องของ Token จากหัวข้อ "Authorization"
+        String token = authorizationHeader.substring("Bearer ".length());
+        Claims claims = Jwts.parser()
+                .setSigningKey(jwt_secret) // ใส่คีย์ลับของคุณที่นี่
+                .parseClaimsJws(token)
+                .getBody();
+
+        // ตรวจสอบว่า Token ไม่หมดอายุ
+        Date expiration = claims.getExpiration();
+        if (expiration != null && expiration.before(new Date())) {
+            ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+        }
+
+        // สร้างคำสั่ง SQL เพื่อค้นหาข้อมูลผู้ใช้ด้วย user_id
+        String sql = "SELECT tb_users.user_id, tb_users.username, tb_users.first_name, tb_users.last_name, tb_users.datebirth,tb_users.secret_password, tb_users.phone, tb_users.role_id, tb_users.email, tb_users.image_profile, tb_users.created_at, tb_users.create_by, tb_users.is_active, tb_users.gender, tb_users.address, tb_role.role_name " +
                 "FROM tb_users " +
                 "JOIN tb_role ON tb_users.role_id = tb_role.role_id " +
                 "WHERE tb_users.role_id = 3 AND tb_users.user_id = ?";
-        AdminAllDTO user = jdbcTemplate.queryForObject(sql, this::mapUserRow, userId);
+
+        // ดึงข้อมูลผู้ใช้จากฐานข้อมูลโดยใช้ user_id จาก Token
+        AdminAllDTO user = jdbcTemplate.queryForObject(sql, this::mapUserRow, claims.get("user_id", String.class));
+
 
         if (user != null) {
             List<VehicleDTO> usertype = findUserTypeByUserID(user.getUser_id());
@@ -540,7 +558,7 @@ System.out.println(authenticatedUserId);
             BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
             String encryptedPass = bcrypt.encode(req_user.getPassword());
             req_user.setPassword(encryptedPass);
-            req_user.setSecret_password(encryptedPass);
+//            req_user.setSecret_password(encryptedPass);
 //            req_user.setPhone(encryptedPass);
 
             req_user.setIs_active("Active");
@@ -626,7 +644,7 @@ System.out.println(authenticatedUserId);
             BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
             String encryptedPass = bcrypt.encode(admin.getPassword());
             admin.setPassword(encryptedPass);
-            admin.setSecret_password(encryptedPass);
+//            admin.setSecret_password(encryptedPass);
 //            req_user.setPhone(encryptedPass);
 
             admin.setIs_active("Active");
@@ -795,10 +813,13 @@ System.out.println(authenticatedUserId);
                 usersDTO.setFirst_name(rs.getString("first_name"));
                 usersDTO.setPhone(rs.getString("phone"));
                 usersDTO.setDatebirth(rs.getString("datebirth"));
+                usersDTO.setSecret_password(rs.getString("secret_password"));
                 usersDTO.setImage_profile(rs.getString("image_profile"));
                 usersDTO.setCreated_at(rs.getDate("created_at"));
                 usersDTO.setCreate_by(rs.getLong("create_by"));
                 usersDTO.setIs_active(rs.getString("is_active"));
+
+
         usersDTO.setGender(rs.getString("gender"));
         usersDTO.setAddress(rs.getString("address"));
 
