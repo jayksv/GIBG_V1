@@ -7,10 +7,12 @@ import com.Auton.GIBGMain.Response.adminDTO.AdminAllDTO;
 import com.Auton.GIBGMain.Response.adminDTO.userVecleDTO;
 import com.Auton.GIBGMain.entity.LoginResponse;
 import com.Auton.GIBGMain.entity.admin_entity;
+import com.Auton.GIBGMain.entity.user_type.userType_entity;
 import com.Auton.GIBGMain.entity.vehicle_entity.vehicle_entity;
 import com.Auton.GIBGMain.myfuntion.IdGeneratorService;
 import com.Auton.GIBGMain.middleware.authToken;
 import com.Auton.GIBGMain.repository.admin_repository;
+import com.Auton.GIBGMain.repository.usertype_repository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -44,6 +46,9 @@ public class admin_Controller {
 
     @Autowired
     private admin_repository adminRepository;
+
+    @Autowired
+    private usertype_repository usertypeRepository;
 
 
     @Value("${jwt_secret}")
@@ -472,90 +477,9 @@ System.out.println(authenticatedUserId);
 
 
     @PostMapping("/user/add_subadmin")
-    public ResponseEntity<ResponseWrapper<String>> addNewUser(@RequestBody adminRequest req_user) {
+    public ResponseEntity<ResponseWrapper<List<admin_entity>>> addNewUser(@RequestBody admin_entity req_user) {
         try {
-                admin_entity admin = req_user.getAdmin();
-                List<vehicle_entity> vehicle = req_user.getVehicle();
-            // Check if the username already exists
-            admin_entity existingUser = adminRepository.findByUsername(admin.getUsername());
 
-            if (existingUser != null) {
-                // Username already exists, return an error response
-                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Username already exists.", null);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
-            }
-            // Check if the phone number is already registered in the database
-            String phone = admin.getPhone();
-            admin_entity existingUserByPhone = adminRepository.findByPhone(phone);
-            System.out.println(existingUserByPhone);
-
-            if (existingUserByPhone != null) {
-                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Phone number is already registered.", null);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
-            }
-
-
-
-            // Check password
-            String password = admin.getPassword();
-
-            if (password.length() < 8) {
-                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Password should be at least 8 characters long.", null);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
-            }
-            if (!password.matches(".*[a-z].*")) {
-                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Password should contain at least one lowercase letter.", null);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
-            }
-            if (!password.matches(".*[A-Z].*")) {
-                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Password should contain at least one uppercase letter.", null);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
-            }
-            if (!password.matches(".*\\d.*")) {
-                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Password should contain at least one digit.", null);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
-            }
-            if (!password.matches(".*[@#$%^&+=].*")) {
-                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Password should contain at least one special character.", null);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
-            }
-            // Check if the phone number contains only digits
-            if (!admin.getPhone().matches("\\d+")) {
-                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Phone number should contain only digits.", null);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
-            }
-// Rest of your code for user creation
-            // Generate a unique user_id
-            String userId = generateUserId.generateUserId();
-            admin.setUser_id(userId);
-
-            BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
-            String encryptedPass = bcrypt.encode(admin.getPassword());
-            admin.setPassword(encryptedPass);
-            admin.setSecret_password(encryptedPass);
-//            req_user.setPhone(encryptedPass);
-
-            admin.setIs_active("Active");
-//            user.setAddress_id(savedAddress.getAddressId().longValue());
-            admin.setRole_id((long) 2);
-
-                admin_entity savedUser = adminRepository.save(admin);
-
-                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Insert new user and address successful", null);
-                return ResponseEntity.ok(responseWrapper);
-
-
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            String errorMessage = "An error occurred while adding a new user.";
-            ResponseWrapper<String> errorResponse = new ResponseWrapper<>(errorMessage, null);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-        }
-    }
-    @PostMapping("/user/general")
-    public ResponseEntity<ResponseWrapper<List<admin_entity>>> addNewUserGeneral(@RequestBody admin_entity req_user) {
-        try {
             // Check if the username already exists
             admin_entity existingUser = adminRepository.findByUsername(req_user.getUsername());
 
@@ -621,7 +545,7 @@ System.out.println(authenticatedUserId);
 
             req_user.setIs_active("Active");
 //            user.setAddress_id(savedAddress.getAddressId().longValue());
-            req_user.setRole_id((long) 3);
+            req_user.setRole_id((long) 2);
 
             admin_entity savedUser = adminRepository.save(req_user);
 
@@ -637,6 +561,147 @@ System.out.println(authenticatedUserId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+    @PostMapping("/user/general/add")
+    public ResponseEntity<ResponseWrapper<List<admin_entity>>> addNewUserGeneral(@RequestBody adminRequest req_user) {
+        try {
+            admin_entity admin = req_user.getAdmin();
+            List<userType_entity> vehicle = req_user.getVehicle();
+            // Check if the username already exists
+            admin_entity existingUser = adminRepository.findByUsername(admin.getUsername());
+
+            if (existingUser != null) {
+                // Username already exists, return an error response
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Username already exists.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            // Check if the phone number is already registered in the database
+            String phone = admin.getPhone();
+            admin_entity existingUserByPhone = adminRepository.findByPhone(phone);
+            System.out.println(existingUserByPhone);
+
+            if (existingUserByPhone != null) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Phone number is already registered.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+
+
+
+            // Check password
+            String password = admin.getPassword();
+
+            if (password.length() < 8) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should be at least 8 characters long.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            if (!password.matches(".*[a-z].*")) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one lowercase letter.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            if (!password.matches(".*[A-Z].*")) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one uppercase letter.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            if (!password.matches(".*\\d.*")) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one digit.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            if (!password.matches(".*[@#$%^&+=].*")) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one special character.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            // Check if the phone number contains only digits
+            if (!admin.getPhone().matches("\\d+")) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Phone number should contain only digits.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+
+
+// Rest of your code for user creation
+
+
+            // Generate a unique user_id
+            String userId = generateUserId.generateUserId();
+            admin.setUser_id(userId);
+
+            BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
+            String encryptedPass = bcrypt.encode(admin.getPassword());
+            admin.setPassword(encryptedPass);
+            admin.setSecret_password(encryptedPass);
+//            req_user.setPhone(encryptedPass);
+
+            admin.setIs_active("Active");
+//            user.setAddress_id(savedAddress.getAddressId().longValue());
+            admin.setRole_id((long) 3);
+
+
+            admin_entity savedUser = adminRepository.save(admin);
+
+
+            for (userType_entity onevehicle : vehicle) {
+                onevehicle.setUser_id(savedUser.getUser_id()); // Update user_id in userType_entity
+            }
+            usertypeRepository.saveAll(vehicle);
+
+            ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Insert new user and address successful", null);
+            return ResponseEntity.ok(responseWrapper);
+
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            String errorMessage = "An error occurred while adding a new user.";
+            ResponseWrapper<List<admin_entity>> errorResponse = new ResponseWrapper<>(errorMessage, null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    @PutMapping("/update")
+    public ResponseEntity<ResponseWrapper<admin_entity>> updateUser(@RequestParam("userId") String userId, @RequestBody admin_entity updatedUser) {
+        try {
+            // Find the existing user by user ID
+            admin_entity existingUser = adminRepository.findByUserId(userId);
+
+            if (existingUser == null) {
+                // User not found, return an error response
+                ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("User not found.", null);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseWrapper);
+            }
+
+            // Update user fields as needed
+            existingUser.setUsername(updatedUser.getUsername());
+            // Update other fields similarly
+
+            // Check if the password needs to be updated
+//            if (updatedUser.getPassword() != null && !updatedUser.getPassword().isEmpty()) {
+//                // Validate and encrypt the new password
+//                String newPassword = updatedUser.getPassword();
+//                if (newPassword.length() < 8 || !newPassword.matches(".*[a-z].*") || !newPassword.matches(".*[A-Z].*") ||
+//                        !newPassword.matches(".*\\d.*") || !newPassword.matches(".*[@#$%^&+=].*")) {
+//                    ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("Password must meet complexity requirements.", null);
+//                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+//                }
+//                BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
+//                String encryptedPass = bcrypt.encode(newPassword);
+//                existingUser.setPassword(encryptedPass);
+//                existingUser.setSecret_password(encryptedPass);
+//            }
+
+//            // Update the list of vehicles
+//            List<userType_entity> updatedVehicles = updatedUser.getUser_id();
+//            existingUser.setVehicle(updatedVehicles);
+
+            // Save the updated user
+            admin_entity updatedUserData = adminRepository.save(existingUser);
+
+            ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("User updated successfully.", updatedUserData);
+            return ResponseEntity.ok(responseWrapper);
+        } catch (Exception e) {
+            e.printStackTrace();
+            String errorMessage = "An error occurred while updating the user.";
+            ResponseWrapper<admin_entity> errorResponse = new ResponseWrapper<>(errorMessage, null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
     @PutMapping("/user/update_subadmin/{userId}") // Include {userId} in the URL path
     public ResponseEntity<ResponseWrapper<admin_entity>> updateUser(
             @PathVariable String userId, // Add @PathVariable for userId

@@ -16,7 +16,7 @@ public class userType_entity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_vicle_id ")
-    private Long user_vicle_id ;
+    private String user_vicle_id ;
 
     @Column(name = "user_id")
     private String user_id;
