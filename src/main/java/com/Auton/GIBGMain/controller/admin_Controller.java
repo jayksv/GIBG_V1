@@ -18,6 +18,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.micrometer.common.util.StringUtils;
 import io.swagger.annotations.Api;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -495,6 +496,68 @@ System.out.println(authenticatedUserId);
                     .body(new ResponseWrapper<>(errorMessage, null));
         }
     }
+    @PutMapping("/user/vehicle/update")
+    public ResponseEntity<ResponseWrapper<userType_entity>> updateUserVehicle(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestBody admin_entity user,
+            @RequestBody userType_entity updatedVehicle) {
+        try {
+            user.getSecret_password();
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                ResponseWrapper<userType_entity> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                ResponseWrapper<userType_entity> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            // Extract necessary claims (you can add more as needed)
+            String authenticatedUserId = claims.get("user_id", String.class);
+            admin_entity exituser = adminRepository.findByUserId(authenticatedUserId);
+
+            BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
+            if (!bcrypt.matches(user.getPassword(), exituser.getSecret_password())){
+                ResponseWrapper<userType_entity> responseWrapper = new ResponseWrapper<>("password and secret password invalid.", null);
+                return ResponseEntity.ok(responseWrapper);
+            }
+            // Update the user's vehicle in the database
+            String sql = "UPDATE `tb_user_vicle` SET license_plate = ? WHERE user_id = ?";
+            int updatedRows = jdbcTemplate.update(sql,
+                    updatedVehicle.getLicense_plate(),
+                    authenticatedUserId);
+
+            if (updatedRows > 0) {
+                ResponseWrapper<userType_entity> responseWrapper = new ResponseWrapper<>("User vehicle updated successfully.", updatedVehicle);
+                return ResponseEntity.ok(responseWrapper);
+            } else {
+                return ResponseEntity.notFound().build(); // Return 404 without a response body
+            }
+        } catch (JwtException e) {
+            // Log the exception to see the details
+            e.printStackTrace();
+            String errorMessage = "Token is invalid.";
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ResponseWrapper<>(errorMessage, null));
+        } catch (Exception e) {
+            // Log the error for debugging
+            e.printStackTrace();
+            String errorMessage = "An error occurred while updating user vehicle.";
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ResponseWrapper<>(errorMessage, null));
+        }
+    }
 
 
     @PostMapping("/user/add_subadmin")
@@ -587,6 +650,7 @@ System.out.println(authenticatedUserId);
         try {
             admin_entity admin = req_user.getAdmin();
             List<userType_entity> vehicle = req_user.getVehicle();
+
             // Check if the username already exists
             admin_entity existingUser = adminRepository.findByUsername(admin.getUsername());
 
@@ -595,13 +659,17 @@ System.out.println(authenticatedUserId);
                 ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Username already exists.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
+
             // Check if the phone number is already registered in the database
             String phone = admin.getPhone();
             admin_entity existingUserByPhone = adminRepository.findByPhone(phone);
-            System.out.println(existingUserByPhone);
-
             if (existingUserByPhone != null) {
                 ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Phone number is already registered.", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+            }
+            // Check if the JSON does not contain the "vehicle" field
+            if (vehicle.isEmpty()) {
+                ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Vehicle information is required.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
 
@@ -628,65 +696,65 @@ System.out.println(authenticatedUserId);
                 ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one special character.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
+
             // Check if the phone number contains only digits
             if (!admin.getPhone().matches("\\d+")) {
                 ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Phone number should contain only digits.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
 
-
-// Rest of your code for user creation
-
-
-            // Generate a unique user_id
             String userId = generateUserId.generateUserId();
             admin.setUser_id(userId);
 
             BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
             String encryptedPass = bcrypt.encode(admin.getPassword());
             admin.setPassword(encryptedPass);
-//            admin.setSecret_password(encryptedPass);
-//            req_user.setPhone(encryptedPass);
 
             admin.setIs_active("Active");
-//            user.setAddress_id(savedAddress.getAddressId().longValue());
             admin.setRole_id((long) 3);
 
+            admin_entity savedUser = adminRepository.save(admin);
 
-
-
-
-            // เริ่มต้นลูปสำหรับการตรวจสอบ license_plate
             for (userType_entity onevehicle : vehicle) {
                 String licensePlate = onevehicle.getLicense_plate();
 
-                // ตรวจสอบว่า licensePlate ไม่ว่างหรือ null และควรบันทึกข้อมูล
-                if (licensePlate != null && !licensePlate.isEmpty()) {
+                // ตรวจสอบว่า licensePlate ไม่ว่างหรือ null
+                if (licensePlate == null || licensePlate.isEmpty()) {
+                    // License plate ว่าง หรือเป็น null ให้ดำเนินการต่อไปเพื่อบันทึกข้อมูล
+
+                    // บันทึกข้อมูล userType_entity
+                    onevehicle.setUser_id(savedUser.getUser_id()); // อัพเดท user_id ใน userType_entity
+                    usertypeRepository.save(onevehicle);
+                } else {
                     // ตรวจสอบว่า license_plate ถูกต้องหรือไม่
                     if (!isLicensePlateValid(licensePlate)) {
                         ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("License plate is not valid.", null);
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
                     }
-                    admin_entity savedUser = adminRepository.save(admin);
-                    // บันทึกข้อมูล userType_entity
+
+                    // ตรวจสอบว่า licensePlate อยู่ใน tb_vehicle
+                    if (!isLicensePlateInVehicle(licensePlate)) {
+                        ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("License plate is not in tb_vehicle.", null);
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+                    }
+
+//                    admin_entity savedUser = adminRepository.save(admin);
+
                     onevehicle.setUser_id(savedUser.getUser_id()); // อัพเดท user_id ใน userType_entity
                     usertypeRepository.save(onevehicle);
                 }
             }
-
-
             ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Insert new user and address successful", null);
             return ResponseEntity.ok(responseWrapper);
 
-
-
         } catch (Exception e) {
             e.printStackTrace();
-            String errorMessage = "An error occurred while adding a new user.";
+            String errorMessage = "Invalid JSON format or An error occurred while adding a new user.";
             ResponseWrapper<List<admin_entity>> errorResponse = new ResponseWrapper<>(errorMessage, null);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+
     @PutMapping("/update/{userId}")
     public ResponseEntity<ResponseWrapper<admin_entity>> updateUser(
             @PathVariable String userId,
@@ -859,6 +927,7 @@ System.out.println(authenticatedUserId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+
     private AdminAllDTO mapUserRow(ResultSet rs, int rowNum) throws SQLException {
         AdminAllDTO usersDTO = new AdminAllDTO();
                 usersDTO.setUser_id(rs.getString("user_id"));
@@ -905,26 +974,49 @@ System.out.println(authenticatedUserId);
 
         return userType;
     }
-    // เมธอดตรวจสอบหมายเลขทะเบียนรถ
     private boolean isLicensePlateValid(String licensePlate) {
         // ตรวจสอบว่า licensePlate ไม่ว่างหรือ null
-        if (licensePlate != null && !licensePlate.isEmpty()) {
-            // ดึงข้อมูลจาก tb_vehicles โดยใช้ licensePlate เพื่อตรวจสอบว่ามีหรือไม่
-            vehicle_entity vehicle = vehicleRepository.findByLicensePlate(licensePlate);
-
-            // ถ้าไม่พบข้อมูลทะเบียนรถในฐานข้อมูล
-            if (vehicle == null) {
-                return false;
+        if (licensePlate != null) {
+            // ถ้า licensePlate ไม่ว่าง
+            if (!licensePlate.isEmpty()) {
+                // ดึงข้อมูลจาก tb_vehicle โดยใช้ licensePlate เพื่อตรวจสอบว่ามีหรือไม่
+                vehicle_entity vehicle = vehicleRepository.findByLicensePlate(licensePlate);
+                return vehicle != null;
             }
+            // ถ้า licensePlate ว่าง
+            return true;
         }
-        return false; // หรือคุณสามารถเปลี่ยนเป็น false หากต้องการไม่ให้บันทึกข้อมูลผู้ใช้หากไม่มีทะเบียนรถ
+        // ถ้า licensePlate เป็น null
+        return false;
     }
+
+    private boolean isLicensePlateInVehicle(String licensePlate) {
+        // ตรวจสอบว่า licensePlate ไม่ว่างหรือ null
+        if (licensePlate != null) {
+            // ถ้า licensePlate ไม่ว่าง
+            if (!licensePlate.isEmpty()) {
+                // ดึงข้อมูลจาก tb_vehicle โดยใช้ licensePlate เพื่อตรวจสอบว่ามีหรือไม่
+                vehicle_entity vehicle = vehicleRepository.findByLicensePlate(licensePlate);
+                return vehicle != null;
+            }
+            // ถ้า licensePlate ว่าง
+            return true;
+        }
+        // ถ้า licensePlate เป็น null
+        return false;
+    }
+
 
     // Helper method to check if the user has admin or superadmin role
     private boolean isAdminOrSuperAdmin(Claims claims) {
         // Implement your logic to check the user's role here
-        // For example, you can check if claims contain "admin" or "superadmin" role
-        // Return true if the user has the necessary role, otherwise return false
-        return claims != null && (claims.get("role_id").equals("2") || claims.get("role").equals("1"));
+        // For example, you can check if claims contain "role" attribute
+        if (claims != null) {
+            Object role = claims.get("role_id");
+            if (role != null && (role.equals("2") || role.equals("1"))) {
+                return true;
+            }
+        }
+        return false;
     }
 }
