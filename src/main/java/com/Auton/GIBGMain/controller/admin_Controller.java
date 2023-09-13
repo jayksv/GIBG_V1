@@ -13,6 +13,7 @@ import com.Auton.GIBGMain.myfuntion.IdGeneratorService;
 import com.Auton.GIBGMain.middleware.authToken;
 import com.Auton.GIBGMain.repository.admin_repository;
 import com.Auton.GIBGMain.repository.usertype_repository;
+import com.Auton.GIBGMain.repository.vehicle_repository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -49,6 +50,8 @@ public class admin_Controller {
 
     @Autowired
     private usertype_repository usertypeRepository;
+    @Autowired
+    private vehicle_repository vehicleRepository;
 
 
     @Value("${jwt_secret}")
@@ -602,8 +605,6 @@ System.out.println(authenticatedUserId);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
 
-
-
             // Check password
             String password = admin.getPassword();
 
@@ -652,13 +653,27 @@ System.out.println(authenticatedUserId);
             admin.setRole_id((long) 3);
 
 
-            admin_entity savedUser = adminRepository.save(admin);
 
 
+
+            // เริ่มต้นลูปสำหรับการตรวจสอบ license_plate
             for (userType_entity onevehicle : vehicle) {
-                onevehicle.setUser_id(savedUser.getUser_id()); // Update user_id in userType_entity
+                String licensePlate = onevehicle.getLicense_plate();
+
+                // ตรวจสอบว่า licensePlate ไม่ว่างหรือ null และควรบันทึกข้อมูล
+                if (licensePlate != null && !licensePlate.isEmpty()) {
+                    // ตรวจสอบว่า license_plate ถูกต้องหรือไม่
+                    if (!isLicensePlateValid(licensePlate)) {
+                        ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("License plate is not valid.", null);
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+                    }
+                    admin_entity savedUser = adminRepository.save(admin);
+                    // บันทึกข้อมูล userType_entity
+                    onevehicle.setUser_id(savedUser.getUser_id()); // อัพเดท user_id ใน userType_entity
+                    usertypeRepository.save(onevehicle);
+                }
             }
-            usertypeRepository.saveAll(vehicle);
+
 
             ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Insert new user and address successful", null);
             return ResponseEntity.ok(responseWrapper);
@@ -672,9 +687,32 @@ System.out.println(authenticatedUserId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
-    @PutMapping("/update")
-    public ResponseEntity<ResponseWrapper<admin_entity>> updateUser(@RequestParam("userId") String userId, @RequestBody admin_entity updatedUser) {
+    @PutMapping("/update/{userId}")
+    public ResponseEntity<ResponseWrapper<admin_entity>> updateUser(
+            @PathVariable String userId,
+            @RequestBody adminRequest request,
+            @RequestHeader("Authorization") String authorizationHeader) {
         try {
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                // Handle missing or empty Authorization header
+                ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
             // Find the existing user by user ID
             admin_entity existingUser = adminRepository.findByUserId(userId);
 
@@ -685,27 +723,24 @@ System.out.println(authenticatedUserId);
             }
 
             // Update user fields as needed
+            admin_entity updatedUser = request.getAdmin();
             existingUser.setUsername(updatedUser.getUsername());
+            existingUser.setFirst_name(updatedUser.getFirst_name());
+            existingUser.setLast_name(updatedUser.getLast_name());
+            existingUser.setDatebirth(updatedUser.getDatebirth());
+            existingUser.setEmail(updatedUser.getEmail());
+            existingUser.setImage_profile(updatedUser.getImage_profile());
+            existingUser.setGender(updatedUser.getGender());
+            existingUser.setAddress(updatedUser.getAddress());
             // Update other fields similarly
 
-            // Check if the password needs to be updated
-//            if (updatedUser.getPassword() != null && !updatedUser.getPassword().isEmpty()) {
-//                // Validate and encrypt the new password
-//                String newPassword = updatedUser.getPassword();
-//                if (newPassword.length() < 8 || !newPassword.matches(".*[a-z].*") || !newPassword.matches(".*[A-Z].*") ||
-//                        !newPassword.matches(".*\\d.*") || !newPassword.matches(".*[@#$%^&+=].*")) {
-//                    ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("Password must meet complexity requirements.", null);
-//                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
-//                }
-//                BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
-//                String encryptedPass = bcrypt.encode(newPassword);
-//                existingUser.setPassword(encryptedPass);
-//                existingUser.setSecret_password(encryptedPass);
-//            }
+            // Update the list of vehicles
+            List<userType_entity> updatedVehicles = request.getVehicle();
+            for (userType_entity updatedVehicle : updatedVehicles) {
+                String updateUsertypeSql = "UPDATE tb_user_vicle SET license_plate = ? WHERE user_id = ?";
+                jdbcTemplate.update(updateUsertypeSql, updatedVehicle.getLicense_plate(), userId);
 
-//            // Update the list of vehicles
-//            List<userType_entity> updatedVehicles = updatedUser.getUser_id();
-//            existingUser.setVehicle(updatedVehicles);
+            }
 
             // Save the updated user
             admin_entity updatedUserData = adminRepository.save(existingUser);
@@ -720,53 +755,53 @@ System.out.println(authenticatedUserId);
         }
     }
 
-    @PutMapping("/user/update_subadmin/{userId}") // Include {userId} in the URL path
-    public ResponseEntity<ResponseWrapper<admin_entity>> updateUser(
-            @PathVariable String userId, // Add @PathVariable for userId
-            @RequestBody admin_entity updatedUser,
-            @RequestHeader("Authorization") String authorizationHeader) {
-        try {
-            // Validate authorization using authService
-//            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
-//            if (authResponse.getStatusCode() != HttpStatus.OK) {
-//                // Token is invalid or has expired
-//                ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
-//                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+//    @PutMapping("/user/update_subadmin/{userId}") // Include {userId} in the URL path
+//    public ResponseEntity<ResponseWrapper<admin_entity>> updateUser(
+//            @PathVariable String userId, // Add @PathVariable for userId
+//            @RequestBody admin_entity updatedUser,
+//            @RequestHeader("Authorization") String authorizationHeader) {
+//        try {
+//            // Validate authorization using authService
+////            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+////            if (authResponse.getStatusCode() != HttpStatus.OK) {
+////                // Token is invalid or has expired
+////                ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
+////                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+////            }
+//            // Check if the user with the given userId exists
+//            admin_entity existingUser = adminRepository.findByUserId(userId);
+//
+//            if (existingUser == null) {
+//                // User not found, return an error response
+//                ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("User not found.", null);
+//                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseWrapper);
 //            }
-            // Check if the user with the given userId exists
-            admin_entity existingUser = adminRepository.findByUserId(userId);
-
-            if (existingUser == null) {
-                // User not found, return an error response
-                ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("User not found.", null);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseWrapper);
-            }
-
-            // Update the user entity with the new data
-            existingUser.setUsername(updatedUser.getUsername());
-            existingUser.setEmail(updatedUser.getEmail());
-            existingUser.setFirst_name(updatedUser.getFirst_name());
-            existingUser.setLast_name(updatedUser.getLast_name());
-            existingUser.setDatebirth(updatedUser.getDatebirth());
-//            existingUser.setSecret_password(updatedUser.getSecret_password());
-            existingUser.setImage_profile(updatedUser.getImage_profile());
-            existingUser.setGender(updatedUser.getGender());
-            existingUser.setAddress(updatedUser.getAddress());
-            // Update other fields as needed
-
-            // Save the updated user entity
-            admin_entity updatedUserEntity = adminRepository.save(existingUser);
-
-            ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("User updated successfully.", updatedUserEntity);
-            return ResponseEntity.ok(responseWrapper);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            String errorMessage = "An error occurred while updating the user.";
-            ResponseWrapper<admin_entity> errorResponse = new ResponseWrapper<>(errorMessage, null);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-        }
-    }
+//
+//            // Update the user entity with the new data
+//            existingUser.setUsername(updatedUser.getUsername());
+//            existingUser.setEmail(updatedUser.getEmail());
+//            existingUser.setFirst_name(updatedUser.getFirst_name());
+//            existingUser.setLast_name(updatedUser.getLast_name());
+//            existingUser.setDatebirth(updatedUser.getDatebirth());
+////            existingUser.setSecret_password(updatedUser.getSecret_password());
+//            existingUser.setImage_profile(updatedUser.getImage_profile());
+//            existingUser.setGender(updatedUser.getGender());
+//            existingUser.setAddress(updatedUser.getAddress());
+//            // Update other fields as needed
+//
+//            // Save the updated user entity
+//            admin_entity updatedUserEntity = adminRepository.save(existingUser);
+//
+//            ResponseWrapper<admin_entity> responseWrapper = new ResponseWrapper<>("User updated successfully.", updatedUserEntity);
+//            return ResponseEntity.ok(responseWrapper);
+//
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            String errorMessage = "An error occurred while updating the user.";
+//            ResponseWrapper<admin_entity> errorResponse = new ResponseWrapper<>(errorMessage, null);
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+//        }
+//    }
 
 
     @DeleteMapping("/user/delete/{userId}")
@@ -775,10 +810,23 @@ System.out.println(authenticatedUserId);
             @RequestHeader("Authorization") String authorizationHeader) {
         try {
             // Validate authorization using authService
-            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
-            if (authResponse.getStatusCode() != HttpStatus.OK) {
-                // Token is invalid or has expired
-                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                // Handle missing or empty Authorization header
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
 
@@ -789,6 +837,13 @@ System.out.println(authenticatedUserId);
                 // User not found, return an error response
                 ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("User not found.", null);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseWrapper);
+            }
+
+            // Check if the authenticated user has the necessary role to delete users
+            if (!isAdminOrSuperAdmin(claims)) {
+                // User doesn't have the required role, return an error response
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Permission denied.", null);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
             }
 
             // Delete the user
@@ -804,7 +859,6 @@ System.out.println(authenticatedUserId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
-
     private AdminAllDTO mapUserRow(ResultSet rs, int rowNum) throws SQLException {
         AdminAllDTO usersDTO = new AdminAllDTO();
                 usersDTO.setUser_id(rs.getString("user_id"));
@@ -851,6 +905,26 @@ System.out.println(authenticatedUserId);
 
         return userType;
     }
+    // เมธอดตรวจสอบหมายเลขทะเบียนรถ
+    private boolean isLicensePlateValid(String licensePlate) {
+        // ตรวจสอบว่า licensePlate ไม่ว่างหรือ null
+        if (licensePlate != null && !licensePlate.isEmpty()) {
+            // ดึงข้อมูลจาก tb_vehicles โดยใช้ licensePlate เพื่อตรวจสอบว่ามีหรือไม่
+            vehicle_entity vehicle = vehicleRepository.findByLicensePlate(licensePlate);
 
+            // ถ้าไม่พบข้อมูลทะเบียนรถในฐานข้อมูล
+            if (vehicle == null) {
+                return false;
+            }
+        }
+        return false; // หรือคุณสามารถเปลี่ยนเป็น false หากต้องการไม่ให้บันทึกข้อมูลผู้ใช้หากไม่มีทะเบียนรถ
+    }
 
+    // Helper method to check if the user has admin or superadmin role
+    private boolean isAdminOrSuperAdmin(Claims claims) {
+        // Implement your logic to check the user's role here
+        // For example, you can check if claims contain "admin" or "superadmin" role
+        // Return true if the user has the necessary role, otherwise return false
+        return claims != null && (claims.get("role_id").equals("2") || claims.get("role").equals("1"));
+    }
 }

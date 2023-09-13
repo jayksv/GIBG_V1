@@ -1,5 +1,6 @@
 package com.Auton.GIBGMain.entity;
 
+import com.Auton.GIBGMain.entity.user_type.userType_entity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -8,6 +9,7 @@ import lombok.Setter;
 import org.hibernate.annotations.GenericGenerator;
 
 import java.util.Date;
+import java.util.List;
 
 @Entity
 @Table(name = "tb_users")

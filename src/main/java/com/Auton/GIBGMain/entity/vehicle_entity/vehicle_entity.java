@@ -15,8 +15,8 @@ import lombok.Setter;
 public class vehicle_entity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "license plate  ")
-    private String license_plate;
+    @Column(name = "license_plate  ")
+    private String licensePlate;
 
     @Column(name = "Vehicle_type")
     private String Vehicle_type;
@@ -53,4 +53,6 @@ public class vehicle_entity {
 
     @Column(name = "Final_inspection_date")
     private String Final_inspection_date;
+
+
 }
