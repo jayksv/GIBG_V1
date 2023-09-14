@@ -17,5 +17,5 @@ import java.util.List;
 public class vehicle_request {
 
         private admin_entity users;
-        private List<userType_entity> vehicle;
+        private List<userType_entity> updatedVehicle;
 }

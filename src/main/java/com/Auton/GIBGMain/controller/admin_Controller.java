@@ -708,7 +708,9 @@ System.out.println(authenticatedUserId);
 
             BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
             String encryptedPass = bcrypt.encode(admin.getPassword());
+            String encryptedSecret = bcrypt.encode(admin.getSecret_password());
             admin.setPassword(encryptedPass);
+            admin.setSecret_password(encryptedSecret);
 
             admin.setIs_active("Active");
             admin.setRole_id((long) 3);

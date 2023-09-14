@@ -28,5 +28,5 @@ public class AdminAllDTO {
     private String gender;
     private String address;
     private String shop_id;
-//    private Long user_vicle_id ;
+
 }

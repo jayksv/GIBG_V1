@@ -72,7 +72,5 @@ public class admin_entity {
     @Column(name = "created_at")
     private String created_at;
 
-    @Column(name = "user_vicle_id ")
-    private Long user_vicle_id ;
 
 }
