@@ -2,7 +2,12 @@ package com.Auton.GIBGMain.controller.vehicle_controller;
 
 import ch.qos.logback.core.net.SMTPAppenderBase;
 import com.Auton.GIBGMain.Response.ResponseWrapper;
+import com.Auton.GIBGMain.Response.adminDTO.AdminAllDTO;
 import com.Auton.GIBGMain.Response.adminDTO.adminRequest;
+import com.Auton.GIBGMain.Response.adminDTO.userVecleDTO;
+import com.Auton.GIBGMain.Response.userVecleDTO.VehicleDTO;
+//import com.Auton.GIBGMain.Response.vehicle.vehicleAllDTO;
+import com.Auton.GIBGMain.Response.vehicle.vehicleAllDTO;
 import com.Auton.GIBGMain.entity.admin_entity;
 import com.Auton.GIBGMain.entity.user_type.userType_entity;
 import com.Auton.GIBGMain.entity.vehicle_entity.vehicle_entity;
@@ -23,10 +28,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/vehicle")
@@ -55,11 +59,56 @@ public class vehicle_controller {
         this.authService = authService;
         this.generateUserId = generateUserId;
     }
+    @GetMapping("/all")
+    public ResponseEntity<?> getAllVehicles(@RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            // Validate authorization using authService
+            ResponseEntity<ResponseWrapper<Void>> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+            // Extract necessary claims (you can add more as needed)
+            String authenticatedUserId = claims.get("user_id", String.class);
+            Long roleId = claims.get("role_id", Long.class);
+
+//            String role = claims.get("role_name", String.class);
+            // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
+            if (roleId !=1  && roleId !=2 ) {
+                ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
+            }
+
+
+            String sql = "SELECT * FROM `tb_vehicles`"; // Replace with your SQL query
+            List<vehicleAllDTO> vehicles = jdbcTemplate.query(sql, this::mapVehicleRow);
+
+            return ResponseEntity.ok(vehicles);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
     @PutMapping("/update")
     public ResponseEntity<ResponseWrapper<List<admin_entity>>> updateVehicleInformation(
             @RequestHeader("Authorization") String authorizationHeader,
             @RequestBody adminRequest req_user
-            ) {
+    ) {
         try {
             userType_entity updatedVehicle = new userType_entity();
             BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
@@ -91,15 +140,20 @@ public class vehicle_controller {
                 ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password and secret password do not match.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
-
-            // เก็บเลขทะเบียนรถที่เคยเห็นแล้ว
             Set<String> seenLicensePlates = new HashSet<>();
 
-// ดำเนินการตรวจสอบและอัปเดตข้อมูลยานพาหนะตามที่คุณต้องการ
+// ดึงข้อมูลเลขทะเบียนรถทั้งหมดของ user_id นี้
+            String selectSqlUserVicle = "SELECT license_plate FROM tb_user_vicle WHERE user_id = ?";
+            List<String> userLicensePlates = jdbcTemplate.queryForList(selectSqlUserVicle, String.class, authenticatedUserId);
+
+// ตรวจสอบความถูกต้องของข้อมูลยานพาหนะและการช้ำ
+
+            String deleteSqlUserVicle = "DELETE FROM tb_user_vicle WHERE user_id = ?";
+            jdbcTemplate.update(deleteSqlUserVicle, authenticatedUserId);
+
             List<userType_entity> vehicle = req_user.getVehicle();
             for (userType_entity oneVehicle : vehicle) {
                 String licensePlate = oneVehicle.getLicense_plate();
-
                 // ตรวจสอบความถูกต้องของข้อมูลยานพาหนะ
                 if (!isValidLicensePlate(licensePlate)) {
                     ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("License plate is not valid.", null);
@@ -112,31 +166,17 @@ public class vehicle_controller {
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
                 }
 
-                // ตรวจสอบว่าเลขทะเบียนรถอยู่ในฐานข้อมูลหรือไม่
-                if (!isLicensePlateInDatabase(licensePlate)) {
-                    ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("License plate does not exist in the database.", null);
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
-                }
+                // เพิ่มเลขทะเบียนรถลงใน Set เพื่อตรวจสอบในรอบถัดไป
+                seenLicensePlates.add(licensePlate);
 
-
-
-                // เพิ่มเลขทะเบียนรถลงในเซ็ตเพื่อตรวจสอบในรอบถัดไป
-                seenLicensePlates.add(oneVehicle.getLicense_plate());
-
-                // กำหนดค่า updatedVehicle เท่ากับ oneVehicle
-                updatedVehicle = oneVehicle;
-
-                // ลบข้อมูลยานพาหนะเดิมและเพิ่มข้อมูลใหม่ลงในฐานข้อมูล
-                String deleteSql = "DELETE FROM tb_user_vicle WHERE user_id = ? AND license_plate = ?";
-                jdbcTemplate.update(deleteSql, authenticatedUserId, oneVehicle.getLicense_plate());
-                String insertSql = "INSERT INTO tb_user_vicle (user_id, license_plate) VALUES (?, ?)";
-                jdbcTemplate.update(insertSql, authenticatedUserId, updatedVehicle.getLicense_plate());
+                // เพิ่มข้อมูลใหม่ลงใน tb_user_vicle
+                String insertSqlUserVicle = "INSERT INTO tb_user_vicle (user_id, license_plate) VALUES (?, ?)";
+                jdbcTemplate.update(insertSqlUserVicle, authenticatedUserId, licensePlate);
             }
-
-
 
             ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Update vehicle information successful", null);
             return ResponseEntity.ok(responseWrapper);
+
 
         } catch (JwtException e) {
             // Log the exception to see the details
@@ -153,31 +193,42 @@ public class vehicle_controller {
         }
     }
 
+
     private boolean isValidLicensePlate(String licensePlate) {
-        // ตรวจสอบว่า licensePlate เป็นตัวเลขและมีความยาวที่ถูกต้อง (ตัวอย่างเช่น 2 ถึง 7 หลัก)
+        // Validate that the licensePlate is not null, and it matches the desired pattern
         return licensePlate != null && licensePlate.matches("\\d{2,7}");
     }
 
     private boolean isLicensePlateInDatabase(String licensePlate) {
-        // เพิ่มโค้ดเชื่อมต่อกับฐานข้อมูลเพื่อตรวจสอบว่า licensePlate อยู่ในฐานข้อมูลหรือไม่
-        // คืนค่า true หากมีในฐานข้อมูลแล้ว หรือคืนค่า false ถ้าไม่มี
-        // เปลี่ยนโค้ดด้านล่างให้สอดคล้องกับระบบฐานข้อมูลของคุณ
-        // เช่น ถ้าคุณใช้ Spring JDBC Template จะเป็นไปดังนี้
+        // Query the database to check if the licensePlate exists in the database
         String sql = "SELECT COUNT(*) FROM tb_user_vicle WHERE license_plate = ?";
-        int count = jdbcTemplate.queryForObject(sql, Integer.class, licensePlate);
-        return count > 0;
+        int userVicleCount = jdbcTemplate.queryForObject(sql, Integer.class, licensePlate);
+
+        sql = "SELECT COUNT(*) FROM tb_vehicles WHERE license_plate = ?";
+        int vehiclesCount = jdbcTemplate.queryForObject(sql, Integer.class, licensePlate);
+
+        // If either count is greater than 0, the license plate is in the database
+        return userVicleCount > 0 || vehiclesCount > 0;
     }
 
-    private void updateVehicleInDatabase(userType_entity vehicle) {
-        // ก่อนที่จะเพิ่มข้อมูลใหม่ลงในฐานข้อมูล
-        // ลบข้อมูลเดิมของ vehicle ออกจากฐานข้อมูล
-        String deleteSql = "DELETE FROM tb_user_vicle WHERE user_id = ? AND license_plate = ?";
-        jdbcTemplate.update(deleteSql, vehicle.getUser_id(), vehicle.getLicense_plate());
+    private vehicleAllDTO mapVehicleRow(ResultSet rs, int rowNum) throws SQLException {
+        vehicleAllDTO vehicleDTO = new vehicleAllDTO();
+        vehicleDTO.setLicense_plate(rs.getString("license_plate"));
+        vehicleDTO.setVehicle_type(rs.getString("Vehicle_type"));
+        vehicleDTO.setManufacturer(rs.getString("Manufacturer"));
+        vehicleDTO.setVehicle_type_name(rs.getString("Vehicle_type_name"));
+        vehicleDTO.setVehicle_year(rs.getString("vehicle_year"));
+        vehicleDTO.setFuel(rs.getString("fuel"));
+        vehicleDTO.setExhast_cc(rs.getString("exhast_cc"));
+        vehicleDTO.setColor_vehicle(rs.getString("color_vehicle"));
+        vehicleDTO.setFirst_registration(rs.getString("first_registration"));
+        vehicleDTO.setVehicle_stand_number(rs.getString("vehicle_stand_number"));
+        vehicleDTO.setDate_of_vehicle(rs.getString("date_of_vehicle"));
+        vehicleDTO.setClassification_of_vehicle_type(rs.getString("Classification_of_vehicle_type"));
+        vehicleDTO.setFinal_inspection_date(rs.getString("Final_inspection_date"));
 
-        // ต่อมาให้เพิ่มข้อมูลใหม่ลงในฐานข้อมูล
-        String insertSql = "INSERT INTO tb_user_vicle (user_id, license_plate) VALUES (?, ?)";
-        jdbcTemplate.update(insertSql, vehicle.getUser_id(), vehicle.getLicense_plate());
+        return vehicleDTO;
+
     }
-
 
 }

@@ -32,9 +32,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -372,68 +370,51 @@ public ResponseEntity<?> getUserById(@RequestHeader("Authorization") String auth
 }
 
     @PostMapping("/user/profile")
-    public ResponseEntity<ResponseWrapper<AdminAllDTO>> getUserProfile(@RequestHeader("Authorization") String authorizationHeader) {
+    public ResponseEntity<?> getUserProfile(@RequestHeader("Authorization") String authorizationHeader) {
         try {
             if (authorizationHeader == null || authorizationHeader.isBlank()) {
-                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+                // ถ้าหัวข้อ "Authorization" ว่างหรือไม่มีอยู่ในคำขอ
+                // สร้างข้อความผิดพลาดและส่งคำขอไม่อนุญาต
+                ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
 
-            // Verify the token from the Authorization header
+            // ตรวจสอบความถูกต้องของ Token จากหัวข้อ "Authorization"
             String token = authorizationHeader.substring("Bearer ".length());
-
             Claims claims = Jwts.parser()
-                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .setSigningKey(jwt_secret) // ใส่คีย์ลับของคุณที่นี่
                     .parseClaimsJws(token)
                     .getBody();
 
-            // Check token expiration
+            // ตรวจสอบว่า Token ไม่หมดอายุ
             Date expiration = claims.getExpiration();
             if (expiration != null && expiration.before(new Date())) {
-                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+                ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
 
-            // Extract necessary claims (you can add more as needed)
-            String authenticatedUserId = claims.get("user_id", String.class);
+            // สร้างคำสั่ง SQL เพื่อค้นหาข้อมูลโปรไฟล์ของผู้ใช้ด้วย user_id จาก Token
+            String sql = "SELECT tb_users.user_id, tb_users.username, tb_users.first_name, tb_users.last_name, tb_users.datebirth,tb_users.secret_password, tb_users.phone, tb_users.role_id, tb_users.email, tb_users.image_profile, tb_users.created_at, tb_users.create_by, tb_users.is_active, tb_users.gender, tb_users.address, tb_role.role_name " +
+                    "FROM tb_users " +
+                    "JOIN tb_role ON tb_users.role_id = tb_role.role_id " +
+                    "WHERE tb_users.role_id = 3 AND tb_users.user_id = ?";
 
-System.out.println(authenticatedUserId);
-            // Query the user by ID
-            String sql = "SELECT * FROM `gibg_view` WHERE user_id = ?";
-            AdminAllDTO user = jdbcTemplate.queryForObject(sql, new Object[] { authenticatedUserId }, (resultSet, rowNum) -> {
-                AdminAllDTO userDTO = new AdminAllDTO();
-                userDTO.setUser_id(resultSet.getString("user_id"));
-                userDTO.setUsername(resultSet.getString("username"));
-                userDTO.setEmail(resultSet.getString("email"));
-//                usersDTO.setFirst_name(resultSet.getString("first_name"));
-                userDTO.setPhone(resultSet.getString("phone"));
-//                userDTO.setVehicle_id(resultSet.getString("vehicle_id"));
-                userDTO.setCreated_at(resultSet.getDate("created_at"));
-                userDTO.setIs_active(resultSet.getString("is_active"));
-                return userDTO;
-            });
+            // ดึงข้อมูลโปรไฟล์ของผู้ใช้จากฐานข้อมูลโดยใช้ user_id จาก Token
+            AdminAllDTO userProfile = jdbcTemplate.queryForObject(sql, this::mapUserRow, claims.get("user_id", String.class));
 
-            if (user != null) {
-                ResponseWrapper<AdminAllDTO> responseWrapper = new ResponseWrapper<>("User profile retrieved successfully.", user);
-                return ResponseEntity.ok(responseWrapper);
+            if (userProfile != null) {
+                List<VehicleDTO> userVehicles = findUserTypeByUserID(userProfile.getUser_id());
+                userVecleDTO response = new userVecleDTO("Success", userProfile, userVehicles);
+                return ResponseEntity.ok(response);
             } else {
-                return ResponseEntity.notFound().build(); // Return 404 without a response body
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseWrapper<>("User profile not found", null));
             }
-        } catch (JwtException e) {
-            // Log the exception to see the details
+        } catch (Exception e) {
             e.printStackTrace();
-            String errorMessage = "Token is invalid.";
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ResponseWrapper<>(errorMessage, null));
-        }
-        catch (Exception e) {
-            // Log the error for debugging
-            e.printStackTrace();
-            String errorMessage = "An error occurred while retrieving user profile.";
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ResponseWrapper<>(errorMessage, null));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
+
     @PutMapping("/user/profile/update")
     public ResponseEntity<ResponseWrapper<AdminAllDTO>> updateUserProfile(
             @RequestHeader("Authorization") String authorizationHeader,
@@ -463,7 +444,7 @@ System.out.println(authenticatedUserId);
             String authenticatedUserId = claims.get("user_id", String.class);
 
             // Update the user's profile in the database
-            String sql = "UPDATE `gibg_view` SET username = ?, email = ?, phone = ? WHERE user_id = ?";
+            String sql = "UPDATE `tb_gibg_view` SET username = ?, email = ?, phone = ? WHERE user_id = ?";
             int updatedRows = jdbcTemplate.update(sql,
                     updatedUserProfile.getUsername(),
                     updatedUserProfile.getEmail(),
@@ -673,6 +654,7 @@ System.out.println(authenticatedUserId);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
 
+
             // Check password
             String password = admin.getPassword();
 
@@ -703,6 +685,7 @@ System.out.println(authenticatedUserId);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
 
+
             String userId = generateUserId.generateUserId();
             admin.setUser_id(userId);
 
@@ -716,6 +699,7 @@ System.out.println(authenticatedUserId);
             admin.setRole_id((long) 3);
 
             admin_entity savedUser = adminRepository.save(admin);
+            // Use a Set to keep track of processed licensePlate values
 
             for (userType_entity onevehicle : vehicle) {
                 String licensePlate = onevehicle.getLicense_plate();
@@ -723,10 +707,13 @@ System.out.println(authenticatedUserId);
                 // ตรวจสอบว่า licensePlate ไม่ว่างหรือ null
                 if (licensePlate == null || licensePlate.isEmpty()) {
                     // License plate ว่าง หรือเป็น null ให้ดำเนินการต่อไปเพื่อบันทึกข้อมูล
+                    if (licensePlate == null || licensePlate.isEmpty()) {
 
+                    }
                     // บันทึกข้อมูล userType_entity
                     onevehicle.setUser_id(savedUser.getUser_id()); // อัพเดท user_id ใน userType_entity
                     usertypeRepository.save(onevehicle);
+
                 } else {
                     // ตรวจสอบว่า license_plate ถูกต้องหรือไม่
                     if (!isLicensePlateValid(licensePlate)) {
@@ -740,12 +727,19 @@ System.out.println(authenticatedUserId);
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
                     }
 
+//                    if (isLicensePlateDuplicated(licensePlate)) {
+//                        ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Duplicate entry for license plate.", null);
+//                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+//                    }
+
+
 //                    admin_entity savedUser = adminRepository.save(admin);
 
                     onevehicle.setUser_id(savedUser.getUser_id()); // อัพเดท user_id ใน userType_entity
                     usertypeRepository.save(onevehicle);
                 }
             }
+
             ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Insert new user and address successful", null);
             return ResponseEntity.ok(responseWrapper);
 
@@ -1021,4 +1015,7 @@ System.out.println(authenticatedUserId);
         }
         return false;
     }
+
+
+
 }
