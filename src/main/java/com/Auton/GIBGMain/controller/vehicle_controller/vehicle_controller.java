@@ -83,15 +83,15 @@ public class vehicle_controller {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
             // Extract necessary claims (you can add more as needed)
-            String authenticatedUserId = claims.get("user_id", String.class);
-            Long roleId = claims.get("role_id", Long.class);
-
-//            String role = claims.get("role_name", String.class);
-            // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
-            if (roleId !=1  && roleId !=2 ) {
-                ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
-            }
+//            String authenticatedUserId = claims.get("user_id", String.class);
+//            Long roleId = claims.get("role_id", Long.class);
+//
+////            String role = claims.get("role_name", String.class);
+//            // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
+//            if (roleId !=1  && roleId !=2 ) {
+//                ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
+//                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
+//            }
 
 
             String sql = "SELECT * FROM `tb_vehicles`"; // Replace with your SQL query
@@ -140,7 +140,6 @@ public class vehicle_controller {
                 ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Password and secret password do not match.", null);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
             }
-            Set<String> seenLicensePlates = new HashSet<>();
 
 // ดึงข้อมูลเลขทะเบียนรถทั้งหมดของ user_id นี้
             String selectSqlUserVicle = "SELECT license_plate FROM tb_user_vicle WHERE user_id = ?";
@@ -151,27 +150,25 @@ public class vehicle_controller {
             String deleteSqlUserVicle = "DELETE FROM tb_user_vicle WHERE user_id = ?";
             jdbcTemplate.update(deleteSqlUserVicle, authenticatedUserId);
 
-            List<userType_entity> vehicle = req_user.getVehicle();
-            for (userType_entity oneVehicle : vehicle) {
-                String licensePlate = oneVehicle.getLicense_plate();
+            List<userType_entity> vehiclesToUpdate = req_user.getVehicle();
+            for (userType_entity newVehicle : vehiclesToUpdate) {
+                String newLicensePlate = newVehicle.getLicense_plate();
+
                 // ตรวจสอบความถูกต้องของข้อมูลยานพาหนะ
-                if (!isValidLicensePlate(licensePlate)) {
+                if (!isValidLicensePlate(newLicensePlate)) {
                     ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("License plate is not valid.", null);
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
                 }
 
-                // ตรวจสอบว่าเลขทะเบียนรถไม่ซ้ำกัน
-                if (seenLicensePlates.contains(licensePlate)) {
-                    ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Duplicate license plate found in the request.", null);
+                // ตรวจสอบว่า newLicensePlate ไม่ซ้ำกับข้อมูลที่มีอยู่ใน userLicensePlates
+                if (userLicensePlates.contains(newLicensePlate)) {
+                    // แจ้งข้อผิดพลาดว่ามี license plate ที่ซ้ำกัน
+                    ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("License plate is duplicate.", null);
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
                 }
-
-                // เพิ่มเลขทะเบียนรถลงใน Set เพื่อตรวจสอบในรอบถัดไป
-                seenLicensePlates.add(licensePlate);
-
                 // เพิ่มข้อมูลใหม่ลงใน tb_user_vicle
                 String insertSqlUserVicle = "INSERT INTO tb_user_vicle (user_id, license_plate) VALUES (?, ?)";
-                jdbcTemplate.update(insertSqlUserVicle, authenticatedUserId, licensePlate);
+                jdbcTemplate.update(insertSqlUserVicle, authenticatedUserId, newLicensePlate);
             }
 
             ResponseWrapper<List<admin_entity>> responseWrapper = new ResponseWrapper<>("Update vehicle information successful", null);
