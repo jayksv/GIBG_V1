@@ -103,6 +103,52 @@ public class vehicle_controller {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
+    @GetMapping("/findby/{license_plate}")
+    public ResponseEntity<?> getFindByIdVehicles(@PathVariable("license_plate") String licensePlate,
+                                                 @RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            // Validate authorization using authService
+            ResponseEntity<ResponseWrapper<Void>> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+            // Extract necessary claims (you can add more as needed)
+//            String authenticatedUserId = claims.get("user_id", String.class);
+//            Long roleId = claims.get("role_id", Long.class);
+//
+////            String role = claims.get("role_name", String.class);
+//            // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
+//            if (roleId !=1  && roleId !=2 ) {
+//                ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
+//                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
+//            }
+
+
+            String sql = "SELECT * FROM `tb_vehicles` WHERE license_plate = ?"; // Replace with your SQL query
+            List<vehicleAllDTO> vehicles = jdbcTemplate.query(sql, this::mapVehicleRow, licensePlate);
+
+
+            return ResponseEntity.ok(vehicles);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
 
     @PutMapping("/update")
     public ResponseEntity<ResponseWrapper<List<admin_entity>>> updateVehicleInformation(
