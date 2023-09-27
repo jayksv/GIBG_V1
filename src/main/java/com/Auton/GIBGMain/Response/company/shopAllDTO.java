@@ -22,10 +22,12 @@ public class shopAllDTO {
     private String country;
     private BigDecimal latitude;
     private BigDecimal longitude;
-    private Long shop_type_id;
+    private String  type_name;
     private String shop_image;
+    private String shop_phone;
+    private String shop_mail;
+    private String shop_website;
 
-    private Long shop_status_id;
     private Time monday_open;
     private Time monday_close;
     private Time tuesday_open;
@@ -41,7 +43,4 @@ public class shopAllDTO {
     private Time sunday_open;
     private Time sunday_close;
 
-    private String type_name;
-    private String shop_owner;
-    private String status_name;
 }
