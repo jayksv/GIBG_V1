@@ -2,6 +2,7 @@ package com.Auton.GIBGMain.controller.company;
 
 import com.Auton.GIBGMain.Response.ResponseWrapper;
 import com.Auton.GIBGMain.Response.company.*;
+import com.Auton.GIBGMain.entity.service.serviceType_entity;
 import com.Auton.GIBGMain.entity.shop.shop_entity;
 import com.Auton.GIBGMain.entity.shop.shop_image_entity;
 import com.Auton.GIBGMain.entity.shop.shop_service_entity;
@@ -81,7 +82,122 @@ public class shop_controller {
             return ResponseEntity.ok(responses);
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            ResponseWrapper<List<serviceType_entity>> responseWrapper = new ResponseWrapper<>("An error occurred while retrieving the Shop", null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseWrapper);
+        }
+    }
+    @GetMapping("/shop/findbyid/{shop_id}")
+    public ResponseEntity<?> getShopFindById(@RequestHeader("Authorization") String authorizationHeader,
+                                         @PathVariable("shop_id") Long shopId) {
+        try {
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ResponseWrapper<>("Authorization header is missing or empty.", null));
+            }
+
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ResponseWrapper<>("Token has expired.", null));
+            }
+
+            // Extract necessary claims (you can add more as needed)
+            String authenticatedUserId = claims.get("user_id", String.class);
+            Integer role = claims.get("role_id", Integer.class);
+
+            // Check if the user has the appropriate role to perform this action (e.g., role_id = 2)
+            if (role != 2) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new ResponseWrapper<>("You are not authorized to perform this action.", null));
+            }
+
+            String sql = "SELECT * FROM `shop_view` WHERE shop_id = ?";
+            List<shopAllDTO> shopInfo = jdbcTemplate.query(sql, new Object[]{shopId}, this::mapShopAll);
+
+            List<shopOwner_DTO> responses = new ArrayList<>();
+
+            for (shopAllDTO usershopInfo : shopInfo) {
+                List<shopAmenitiesDTO> amenity = findshopAmenrities(usershopInfo.getShop_id());
+                List<shop_image_entity> image = findImage(usershopInfo.getShop_id());
+                List<shopServiceDTO> service = findService(usershopInfo.getShop_id());
+                List<shopTypeDTO> types = findShopType(usershopInfo.getShop_id());
+
+                shopOwner_DTO res = new shopOwner_DTO("Success", usershopInfo, amenity, image, service, types);
+                responses.add(res);
+            }
+
+            return ResponseEntity.ok(responses);
+        } catch (Exception e) {
+            e.printStackTrace();
+            ResponseWrapper<List<serviceType_entity>> responseWrapper = new ResponseWrapper<>("An error occurred while retrieving the Shop", null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseWrapper);
+        }
+    }
+    @GetMapping("/shop/info")
+    public ResponseEntity<?> getShopInfo(@RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ResponseWrapper<>("Authorization header is missing or empty.", null));
+            }
+
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ResponseWrapper<>("Token has expired.", null));
+            }
+
+            // Extract necessary claims (you can add more as needed)
+            String authenticatedUserId = claims.get("user_id", String.class);
+            Integer role = claims.get("role_id", Integer.class);
+
+
+            // Check if the user has the appropriate role to perform this action (e.g., shop owner)
+            if (!"2".equals(role)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new ResponseWrapper<>("You are not authorized to perform this action.", null));
+            }
+            String sql = "SELECT * FROM `shop_view` WHERE shop_id = ?";
+            List<shopAllDTO> shopInfo = jdbcTemplate.query(sql, new Object[]{authenticatedUserId}, this::mapShopAll);
+
+            List<shopOwner_DTO> responses = new ArrayList<>();
+
+            for (shopAllDTO usershopInfo : shopInfo) {
+
+                List<shopAmenitiesDTO> amenity = findshopAmenrities(usershopInfo.getShop_id());
+                List<shop_image_entity> image = findImage(usershopInfo.getShop_id());
+                List<shopServiceDTO> service = findService(usershopInfo.getShop_id());
+                List<shopTypeDTO> types = findShopType(usershopInfo.getShop_id());
+
+
+                shopOwner_DTO res =new shopOwner_DTO("Success", usershopInfo, amenity, image, service, types);
+
+                responses.add(res);
+            }
+
+            return ResponseEntity.ok(responses);
+        } catch (Exception e) {
+            e.printStackTrace();
+            ResponseWrapper<List<serviceType_entity>> responseWrapper = new ResponseWrapper<>("An error occurred while retrieving the Shop", null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseWrapper);
         }
     }
     @PostMapping("/shop/add")
