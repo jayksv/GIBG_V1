@@ -107,4 +107,5 @@ public class shop_entity {
     @Column(name = "shop_website")
     private String shop_website;
 
+
 }

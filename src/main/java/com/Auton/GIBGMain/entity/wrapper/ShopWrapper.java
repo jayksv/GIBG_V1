@@ -1,5 +1,6 @@
 package com.Auton.GIBGMain.entity.wrapper;
 
+import com.Auton.GIBGMain.entity.admin_entity;
 import com.Auton.GIBGMain.entity.shop.*;
 import jakarta.persistence.Embeddable;
 import lombok.AllArgsConstructor;
@@ -20,4 +21,5 @@ public class ShopWrapper {
     private List<shop_service_entity> shop_service;
     private List<shop_image_entity> shop_images;
     private List<shopType_entity> shop_type;
+    private admin_entity user_id;
 }

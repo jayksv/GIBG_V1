@@ -72,5 +72,8 @@ public class admin_entity {
     @Column(name = "created_at")
     private String created_at;
 
+    @Column(name = "shop_id")
+    private Long shop_id;
+
 
 }

@@ -2,12 +2,14 @@ package com.Auton.GIBGMain.controller.company;
 
 import com.Auton.GIBGMain.Response.ResponseWrapper;
 import com.Auton.GIBGMain.Response.company.*;
+import com.Auton.GIBGMain.entity.admin_entity;
 import com.Auton.GIBGMain.entity.service.serviceType_entity;
 import com.Auton.GIBGMain.entity.shop.shop_entity;
 import com.Auton.GIBGMain.entity.shop.shop_image_entity;
 import com.Auton.GIBGMain.entity.shop.shop_service_entity;
 import com.Auton.GIBGMain.entity.wrapper.ShopWrapper;
 import com.Auton.GIBGMain.middleware.authToken;
+import com.Auton.GIBGMain.repository.admin_repository;
 import com.Auton.GIBGMain.repository.company.*;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -17,7 +19,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import com.Auton.GIBGMain.entity.shop.*;
 
@@ -34,6 +35,7 @@ public class shop_controller {
     private String jwt_secret;
     private final JdbcTemplate jdbcTemplate;
     private final authToken authService;
+    private final admin_repository adminRepository;
 
     @Autowired
     private shop_repository shopRepository;
@@ -46,9 +48,10 @@ public class shop_controller {
     @Autowired
     private shopType_Repository shopTypeRepository;
 
-    public shop_controller(JdbcTemplate jdbcTemplate,  authToken authService) {
+    public shop_controller(JdbcTemplate jdbcTemplate, authToken authService, admin_repository adminRepository) {
         this.jdbcTemplate = jdbcTemplate;
         this.authService = authService;
+        this.adminRepository = adminRepository;
     }
     @GetMapping("/shop/all")
     public ResponseEntity<?> getShopOwnerOnly(@RequestHeader("Authorization") String authorizationHeader) {
@@ -171,11 +174,11 @@ public class shop_controller {
 
 
             // Check if the user has the appropriate role to perform this action (e.g., shop owner)
-            if (!"2".equals(role)) {
+            if (role != 2) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(new ResponseWrapper<>("You are not authorized to perform this action.", null));
             }
-            String sql = "SELECT * FROM `shop_view` WHERE shop_id = ?";
+            String sql = "SELECT * FROM `shop_view` WHERE user_id = ?";
             List<shopAllDTO> shopInfo = jdbcTemplate.query(sql, new Object[]{authenticatedUserId}, this::mapShopAll);
 
             List<shopOwner_DTO> responses = new ArrayList<>();
@@ -237,6 +240,7 @@ public class shop_controller {
             }
 
             shop_entity userShop = request.getUserShop();
+            admin_entity user = request.getUser_id();
             List<shop_amenitie_entity> shopAmenrities = request.getShop_amenities();
             List<shop_service_entity> shopServices = request.getShop_service();
             List<shop_image_entity> shopImages = request.getShop_images();
@@ -249,6 +253,11 @@ public class shop_controller {
 //            userShop.setShopStatusId(1L); // You may want to use constants instead of hardcoding IDs
             shop_entity savedShop = shopRepository.save(userShop);
 
+            admin_entity existingUser = adminRepository.findByUserId(user.getUser_id());
+            admin_entity updatedUser = existingUser;
+            updatedUser.setShop_id(savedShop.getShopId());
+
+            admin_entity updatedUserData = adminRepository.save(existingUser);
 
             if (shopAmenrities != null) {
                 for (shop_amenitie_entity amenity : shopAmenrities) {
@@ -309,7 +318,7 @@ public class shop_controller {
         shopInfo.setCountry(rs.getString("country"));
         shopInfo.setLatitude(rs.getBigDecimal("latitude"));
         shopInfo.setLongitude(rs.getBigDecimal("longitude"));
-//        shopInfo.setShop_type_name(rs.getString("shop_type_name"));
+        shopInfo.setUser_id(rs.getString("user_id"));
         shopInfo.setShop_image(rs.getString("shop_image"));
         shopInfo.setShop_phone(rs.getString("shop_phone"));
         shopInfo.setShop_mail(rs.getString("shop_mail"));
